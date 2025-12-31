@@ -3,12 +3,11 @@ add_rules("plugin.compile_commands.autoupdate", {outputdir = "build"})
 
 add_requires("libsdl3_ttf", {configs = {shared = false}, debug = is_mode("debug")})
 
-set_encodings("utf-8")
+set_encodings("source:utf-8")
 
 target("libbgt")
     set_languages("c++latest")
     set_kind("static")
-    set_policy("build.merge_archive", true)
     add_files("src/**.cpp")
     add_includedirs("include/")
     add_headerfiles("include/*.h")
@@ -16,25 +15,27 @@ target("libbgt")
     add_packages("libsdl3_ttf", {public = true})
     -- add_defines("USE_ANSI")
 
-    -- before_link(function (target)
-    --     os.tryrm(target:targetfile())
-    -- end)
+target("libbgt_vendored")
+    set_default(false)
+    set_kind("static")
+    add_deps("libbgt")
+    on_build(function (target)
+        import("utils.archive.merge_staticlib")
 
-    -- after_link(function (target)
-    --     import("utils.archive.merge_staticlib")
+        local staticlibs = {target:dep("libbgt"):targetfile()}
 
-    --     local staticlibs = {}
-
-    --     local pkg = target:pkg("libsdl3_ttf")
-    --     for _, libfile in pairs(pkg:libraryfiles()) do
-    --         table.append(staticlibs, libfile)
-    --     end            
+        for _, pkg in pairs(target:dep("libbgt"):pkgs()) do
+            for _, libfile in pairs(pkg:libraryfiles()) do
+                table.append(staticlibs, libfile)
+            end
+        end
         
-    --     staticlibs = table.unique(staticlibs)
-    --     table.append(staticlibs, target:targetfile())
+        staticlibs = table.unique(staticlibs)
 
-    --     merge_staticlib(target, target:targetfile(), staticlibs)
-    -- end)
+        print("merging static libraries: ", staticlibs)
+
+        merge_staticlib(target, target:targetfile(), staticlibs)
+    end)
 
 target("test-libbgt")
     set_languages("c++latest")
