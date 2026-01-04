@@ -42,11 +42,10 @@ target("libbgt_vendored")
         merge_staticlib(target, target:targetfile(), staticlibs)
     end)
 
-target("test-libbgt")
+target("demo")
     set_languages("c++latest")
     set_kind("binary")
-    add_files("tests/**.cpp")
-    add_includedirs("include/")
+    add_files("demo/**.cpp")
     add_deps("libbgt")
 
 --
