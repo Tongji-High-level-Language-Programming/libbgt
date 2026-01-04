@@ -1,11 +1,9 @@
-/* 测试演示程序 - libbgt 图形库功能展示 */
+/* 演示程序 - libbgt 图形库功能展示 */
 
-// 本测试由 DeepSeek 生成，如果有问题请联系作者反馈
+// 本演示由 DeepSeek 生成，如果有问题请联系作者反馈
 
 #include <iostream>
 #include <iomanip>
-#include <string>
-#include <cstring>
 
 #include "libbgt.h"
 
