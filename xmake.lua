@@ -1,7 +1,7 @@
 add_rules("mode.debug", "mode.release")
 add_rules("plugin.compile_commands.autoupdate", {outputdir = "build"})
 
-add_requires("libsdl3_ttf", {configs = {shared = false}, debug = is_mode("debug")})
+add_requires("libsdl3_ttf", "fontconfig", {configs = {shared = false}, debug = is_mode("debug")})
 
 set_encodings("source:utf-8")
 
@@ -18,7 +18,7 @@ target("libbgt")
     add_includedirs("include/", {public = true})
     add_headerfiles("include/*.h")
     add_headerfiles("include/internal/*.h", {install = false})
-    add_packages("libsdl3_ttf")
+    add_packages("libsdl3_ttf", "fontconfig")
 
     if is_plat("windows") then
         add_syslinks("vcruntime", "msvcrt")

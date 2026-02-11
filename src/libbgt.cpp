@@ -381,15 +381,25 @@ bool bgt_init(int w, int h, const char* title, const char* font_name, int font_s
 	// 如果希望实现光影叠加等效果，可以调用 bgt_set_blend_mode 改变混合模式
 	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
-	// 加载字体及文本引擎
-	if (auto font_path = GetInstalledFontFile(font_name)) {
-		font = TTF_OpenFont(font_path->string().c_str(), static_cast<float>(font_size));
-	}
+	
+  // 加载字体及文本引擎
+  auto font_paths = FontManager().resolve(FontQuery()
+                                              .addFamily(font_name)
+                                              .addFamily("SimSun")
+                                              .addFamily("monospace")
+                                              .setWeight(FC_WEIGHT_REGULAR)
+                                              .setLang("zh-cn"));
+  SDL_assert_always(font_paths.size() && u8"没有找到任何字体文件，无法继续");
 
-	if (!font) {
-		SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, reinterpret_cast<const char*>(u8"未找到 %s 字体"), font_name);
-		font = TTF_OpenFont(GetInstalledFontFile("SimSun")->string().c_str(), static_cast<float>(font_size));
-		SDL_assert(font && u8"未找到新宋体。请检查字体安装情况。");
+	for (const auto& path : font_paths) {
+		auto* current_font =  TTF_OpenFont(
+					reinterpret_cast<const char *>(path.u8string().c_str()),
+					font_size);
+		if (!font) {
+			font = current_font;
+		} else {
+			TTF_AddFallbackFont(font, current_font);
+		}
 	}
 
 	// 对于非等宽字体做出警告
