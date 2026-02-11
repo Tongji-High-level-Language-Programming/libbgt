@@ -347,8 +347,7 @@ bool bgt_init(int w, int h, const char* title, const char* font_name, int font_s
 	const char* title_cstr = utf8_title.c_str();
 #else
 	const char* title_cstr = title;
-	std::cout << title_cstr << std::endl;
-#endif
+	#endif
 	window =
 		SDL_CreateWindow(title_cstr, w, h,
 			SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_INPUT_FOCUS |
@@ -627,7 +626,7 @@ int bgt_getch() {
 
 BGT_Ostream bgt_cout(int x, int y, int r, int g, int b, int a, bool flush)
 {
-	return BGT_Ostream(x, y, r, g, b, a, flush);
+	return BGT_Ostream{x, y, r, g, b, a, flush};
 }
 
 int bgt_read_keyboard_and_mouse(int& mouse_x, int& mouse_y, int& mouse_action,
