@@ -1,15 +1,5 @@
 #pragma once
 
-#ifdef _MSC_VER
-    #pragma comment(lib, "winmm.lib")
-    #pragma comment(lib, "imm32.lib")
-    #pragma comment(lib, "version.lib")
-    #pragma comment(lib, "setupapi.lib")
-    #pragma comment(lib, "rpcrt4.lib")
-    #pragma comment(lib, "usp10.lib")
-    #pragma comment(lib, "libbgt.lib")
-#endif
-
 #include <iosfwd>
 #include <sstream>
 
