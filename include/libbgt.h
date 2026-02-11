@@ -70,7 +70,7 @@ const char* bgt_get_error();
 /**
  * @brief 使用指定颜色清除整个窗口内容
  */
-bool bgt_cls(int r = 0, int g = 0, int b = 0);
+bool bgt_cls(int r = 0, int g = 0, int b = 0, bool flush=false);
 
 /**
  * @brief 刷新屏幕显示，将已绘制但未刷新的内容显示到窗口上

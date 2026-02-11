@@ -458,13 +458,13 @@ void bgt_quit() {
 	SDL_Quit();
 }
 
-bool bgt_cls(int r, int g, int b) {
+bool bgt_cls(int r, int g, int b, bool flush) {
 	if (!renderer || !render_target) {
 		return false;
 	}
 	return SDL_SetRenderTarget(renderer, render_target) &&
 		SDL_SetRenderDrawColor(renderer, r, g, b, BGT_ALPHA_OPAQUE) &&
-		SDL_RenderClear(renderer) && bgt_flush();
+		SDL_RenderClear(renderer) && (!flush || bgt_flush());
 }
 
 bool bgt_rectangle(int x, int y, int w, int h, int r, int g, int b, int a,
