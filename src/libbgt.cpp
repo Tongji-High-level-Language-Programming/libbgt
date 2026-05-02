@@ -623,7 +623,7 @@ int bgt_getch() {
 
 	while (SDL_WaitEvent(&e)) {
 		switch (e.type) {
-		case SDL_EVENT_KEY_UP:
+		case SDL_EVENT_KEY_DOWN:
 			// 通过 GetKeyFromScancode 获取按键码
 			// key_event 参数为 false 时，该函数会正确处理 Shift/Capslock 等修饰符，给出一个对用户友好的结果
 			auto keycode = SDL_GetKeyFromScancode(e.key.scancode, e.key.mod, false);
