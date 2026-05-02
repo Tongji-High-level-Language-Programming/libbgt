@@ -378,6 +378,14 @@ void demo_animation() {
     int direction = 1;  // 1表示向右上，-1表示向左下
 
     while (running) {
+        int mx, my, mouse_action, keycode, key_modifier;
+        int event_type = bgt_read_keyboard_and_mouse(mx, my, mouse_action, keycode, key_modifier);
+        if (event_type == BGT_KEYBOARD_EVENT) {
+            // 按任意键结束动画
+            running = false;
+            bgt_show_str(320, 500, "键盘按键检测到，结束动画演示", 255, 100, 100);
+            bgt_delay(1000);
+        }
         // 清除太阳旧位置
         bgt_rectangle(sun_x - sun_radius - 2, sun_y - sun_radius - 2,
             sun_radius * 2 + 4, sun_radius * 2 + 4, 20, 20, 40, BGT_ALPHA_OPAQUE, false);
@@ -449,8 +457,7 @@ int main() {
     // 结束演示
     bgt_cls(0, 20, 40);
     bgt_show_str(300, 200, "演示结束", 255, 255, 0);
-    bgt_show_str(250, 250, "感谢使用 libbgt 图形库", 200, 200, 255);
-    bgt_show_str(300, 300, "按任意键退出", 100, 255, 100);
+    bgt_show_str(300, 250, "按任意键退出", 100, 255, 100);
     bgt_getch();
 
     // 清理资源
