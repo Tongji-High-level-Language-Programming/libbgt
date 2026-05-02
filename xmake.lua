@@ -9,7 +9,6 @@ option("use_ansi")
     set_default(false)
     set_showmenu(true)
     set_description("Use ANSI encoding instead of UTF-8")
-    add_defines("USE_ANSI")
 
 target("libbgt")
     set_languages("c++latest")
@@ -19,6 +18,10 @@ target("libbgt")
     add_headerfiles("include/*.h")
     add_headerfiles("include/internal/*.h", {install = false})
     add_packages("libsdl3_ttf", "fontconfig")
+
+    if has_config("use_ansi") then
+        add_defines("USE_ANSI")
+    end
 
     if is_plat("windows") then
         add_syslinks("vcruntime", "msvcrt")

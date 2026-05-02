@@ -33,7 +33,7 @@ libbgt is designed specifically for teaching C++ programming. It is purposed to 
 git clone https://github.com/Tongji-High-level-Language-Programming/libbgt.git
 
 # Configure project
-xmake config --use-ansi=[y|n]
+xmake config --use_ansi=[y|n]
 
 # build main library and tests
 xmake
