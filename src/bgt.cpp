@@ -537,14 +537,6 @@ void apply_fps_limit(State &s)
     s.next_frame_ns += period_ns;
 }
 
-void draw_hline(State &s, int x1, int x2, int y)
-{
-    if (x1 > x2) {
-        std::swap(x1, x2);
-    }
-    SDL_RenderLine(s.renderer, static_cast<float>(x1), static_cast<float>(y),
-                   static_cast<float>(x2), static_cast<float>(y));
-}
 
 void draw_text_impl(State &s, int x, int y, const char text[], int size)
 {
@@ -602,14 +594,61 @@ int text_size_impl(State &s, const char text[], int size, bool width)
     return width ? measured_width : measured_height;
 }
 
-bool same_sign_or_zero(int value, int reference)
-{
-    return value == 0 || (value > 0) == (reference > 0);
-}
-
 int edge_value(const Point &a, const Point &b, const Point &p)
 {
     return ((p.x - a.x) * (b.y - a.y)) - ((p.y - a.y) * (b.x - a.x));
+}
+
+struct PointD {
+    double x = 0.0;
+    double y = 0.0;
+};
+
+// 求点 (p1x,p1y) 沿方向 (d1x,d1y) 的直线与点 (p2x,p2y) 沿方向 (d2x,d2y) 的直线的交点。
+// 两条直线平行时返回中点作为 fallback。
+PointD line_intersection(double p1x, double p1y, double d1x, double d1y,
+                         double p2x, double p2y, double d2x, double d2y)
+{
+    const double denom = d1x * d2y - d2x * d1y;
+    if (std::abs(denom) < 1e-10) {
+        return {(p1x + p2x) / 2.0, (p1y + p2y) / 2.0};
+    }
+    const double t = ((p2x - p1x) * d2y - (p2y - p1y) * d2x) / denom;
+    return {p1x + t * d1x, p1y + t * d1y};
+}
+
+// 用 SDL_RenderGeometry 以 triangle fan 方式填充凸多边形。
+void fill_convex_polygon(State &s, const PointD *pts, int count)
+{
+    if (count < 3) {
+        return;
+    }
+    SDL_Vertex *vertices = static_cast<SDL_Vertex *>(
+        SDL_stack_alloc(SDL_Vertex, count));
+    const SDL_Color col = to_sdl_color(s.color);
+    const float inv255 = 1.0F / 255.0F;
+    for (int i = 0; i < count; ++i) {
+        vertices[i].position.x = static_cast<float>(pts[i].x);
+        vertices[i].position.y = static_cast<float>(pts[i].y);
+        vertices[i].color.r = static_cast<float>(col.r) * inv255;
+        vertices[i].color.g = static_cast<float>(col.g) * inv255;
+        vertices[i].color.b = static_cast<float>(col.b) * inv255;
+        vertices[i].color.a = static_cast<float>(col.a) * inv255;
+        vertices[i].tex_coord.x = 0.0F;
+        vertices[i].tex_coord.y = 0.0F;
+    }
+    const int index_count = (count - 2) * 3;
+    int *indices = static_cast<int *>(SDL_stack_alloc(int, index_count));
+    int idx = 0;
+    for (int i = 1; i < count - 1; ++i) {
+        indices[idx++] = 0;
+        indices[idx++] = i;
+        indices[idx++] = i + 1;
+    }
+    SDL_RenderGeometry(s.renderer, nullptr, vertices, count, indices,
+                       index_count);
+    SDL_stack_free(indices);
+    SDL_stack_free(vertices);
 }
 
 bool open_window_impl(int width, int height, const char title[],
@@ -850,9 +889,10 @@ void bgt_draw_line(int x1, int y1, int x2, int y2)
         } else {
             const double px = -dy / length;
             const double py = dx / length;
-            const int half = s.line_width / 2;
-            for (int i = -half; i <= half; ++i) {
-                const float off = static_cast<float>(i);
+            // 浮点偏移：偶数线宽时也精确（如 width=2 → off=-0.5, +0.5）
+            const double center = (s.line_width - 1) / 2.0;
+            for (int i = 0; i < s.line_width; ++i) {
+                const float off = static_cast<float>(i - center);
                 SDL_RenderLine(
                     s.renderer,
                     static_cast<float>(x1) + static_cast<float>(px) * off,
@@ -862,8 +902,6 @@ void bgt_draw_line(int x1, int y1, int x2, int y2)
             }
         }
     }
-
-    apply_render_color(s, s.color);
 }
 
 void bgt_draw_rect(int x, int y, int width, int height)
@@ -873,10 +911,18 @@ void bgt_draw_rect(int x, int y, int width, int height)
         return;
     }
     const int line_width = std::max(1, s.line_width);
-    bgt_fill_rect(x, y, width, line_width);
-    bgt_fill_rect(x, y + height - line_width, width, line_width);
-    bgt_fill_rect(x, y, line_width, height);
-    bgt_fill_rect(x + width - line_width, y, line_width, height);
+
+    // 线宽 >= 短边的一半时，直接填充整个矩形
+    if (line_width * 2 >= width || line_width * 2 >= height) {
+        bgt_fill_rect(x, y, width, height);
+        return;
+    }
+
+    // 四条边互不重叠：上下画满宽，左右只填中间部分
+    bgt_fill_rect(x, y, width, line_width);                          // 上
+    bgt_fill_rect(x, y + height - line_width, width, line_width);    // 下
+    bgt_fill_rect(x, y + line_width, line_width, height - 2 * line_width);         // 左
+    bgt_fill_rect(x + width - line_width, y + line_width, line_width, height - 2 * line_width);  // 右
 }
 
 void bgt_fill_rect(int x, int y, int width, int height)
@@ -898,34 +944,95 @@ void bgt_draw_circle(int x, int y, int radius)
         return;
     }
     apply_render_color(s, s.color);
-    int dx = radius;
-    int dy = 0;
-    int error = 1 - dx;
-    while (dx >= dy) {
-        SDL_RenderPoint(s.renderer, static_cast<float>(x + dx),
-                        static_cast<float>(y + dy));
-        SDL_RenderPoint(s.renderer, static_cast<float>(x + dy),
-                        static_cast<float>(y + dx));
-        SDL_RenderPoint(s.renderer, static_cast<float>(x - dy),
-                        static_cast<float>(y + dx));
-        SDL_RenderPoint(s.renderer, static_cast<float>(x - dx),
-                        static_cast<float>(y + dy));
-        SDL_RenderPoint(s.renderer, static_cast<float>(x - dx),
-                        static_cast<float>(y - dy));
-        SDL_RenderPoint(s.renderer, static_cast<float>(x - dy),
-                        static_cast<float>(y - dx));
-        SDL_RenderPoint(s.renderer, static_cast<float>(x + dy),
-                        static_cast<float>(y - dx));
-        SDL_RenderPoint(s.renderer, static_cast<float>(x + dx),
-                        static_cast<float>(y - dy));
-        ++dy;
-        if (error < 0) {
-            error += (2 * dy) + 1;
+    const int line_width = std::max(1, s.line_width);
+    const int outer_r = radius + (line_width + 1) / 2;
+    const int inner_r = radius - line_width / 2;
+
+    if (line_width <= 1) {
+        // 1px：Bresenham 逐点画圆，收集后批量绘制
+        std::vector<SDL_FPoint> circle_pts;
+        circle_pts.reserve(static_cast<std::size_t>(8 * radius));
+        int dx = radius;
+        int dy = 0;
+        int error = 1 - dx;
+        while (dx >= dy) {
+            const bool diag = (dx == dy);
+            circle_pts.push_back(SDL_FPoint{static_cast<float>(x + dx),
+                                             static_cast<float>(y + dy)});
+            circle_pts.push_back(SDL_FPoint{static_cast<float>(x - dx),
+                                             static_cast<float>(y - dy)});
+            if (dy != 0) {
+                circle_pts.push_back(SDL_FPoint{static_cast<float>(x - dx),
+                                                 static_cast<float>(y + dy)});
+                circle_pts.push_back(SDL_FPoint{static_cast<float>(x + dx),
+                                                 static_cast<float>(y - dy)});
+            }
+            if (!diag) {
+                if (dy != 0) {
+                    circle_pts.push_back(SDL_FPoint{static_cast<float>(x + dy),
+                                                     static_cast<float>(y + dx)});
+                    circle_pts.push_back(SDL_FPoint{static_cast<float>(x - dy),
+                                                     static_cast<float>(y + dx)});
+                    circle_pts.push_back(SDL_FPoint{static_cast<float>(x - dy),
+                                                     static_cast<float>(y - dx)});
+                    circle_pts.push_back(SDL_FPoint{static_cast<float>(x + dy),
+                                                     static_cast<float>(y - dx)});
+                } else {
+                    circle_pts.push_back(SDL_FPoint{static_cast<float>(x),
+                                                     static_cast<float>(y + dx)});
+                    circle_pts.push_back(SDL_FPoint{static_cast<float>(x),
+                                                     static_cast<float>(y - dx)});
+                }
+            }
+            ++dy;
+            if (error < 0) {
+                error += (2 * dy) + 1;
+            }
+            else {
+                --dx;
+                error += 2 * (dy - dx + 1);
+            }
         }
-        else {
-            --dx;
-            error += 2 * (dy - dx + 1);
+        SDL_RenderPoints(s.renderer, circle_pts.data(),
+                         static_cast<int>(circle_pts.size()));
+    } else if (inner_r <= 0) {
+        // 线宽 >= 半径：填充整个外圆
+        bgt_fill_circle(x, y, outer_r);
+    } else {
+        // 粗线：扫描线填充环形区域（外圆 - 内圆），无间隙
+        const int row_count = 2 * outer_r + 1;
+        SDL_FRect *rects = static_cast<SDL_FRect *>(
+            SDL_stack_alloc(SDL_FRect, row_count * 2));
+        int idx = 0;
+        for (int dy = -outer_r; dy <= outer_r; ++dy) {
+            const double oy = static_cast<double>(dy) / outer_r;
+            const int outer_span = static_cast<int>(std::lround(
+                outer_r * std::sqrt(1.0 - oy * oy)));
+            if (std::abs(dy) <= inner_r) {
+                const double iy = static_cast<double>(dy) / inner_r;
+                const int inner_span = static_cast<int>(std::lround(
+                    inner_r * std::sqrt(1.0 - iy * iy)));
+                const int left_w = outer_span - inner_span;
+                // 左半环
+                rects[idx++] = SDL_FRect{
+                    static_cast<float>(x - outer_span),
+                    static_cast<float>(y + dy),
+                    static_cast<float>(left_w), 1.0F};
+                // 右半环（+1 跳过内圆占据的中心列）
+                rects[idx++] = SDL_FRect{
+                    static_cast<float>(x + inner_span + 1),
+                    static_cast<float>(y + dy),
+                    static_cast<float>(left_w), 1.0F};
+            } else {
+                // 内圆不覆盖此行：整行都是环
+                rects[idx++] = SDL_FRect{
+                    static_cast<float>(x - outer_span),
+                    static_cast<float>(y + dy),
+                    static_cast<float>(2 * outer_span + 1), 1.0F};
+            }
         }
+        SDL_RenderFillRects(s.renderer, rects, idx);
+        SDL_stack_free(rects);
     }
 }
 
@@ -936,13 +1043,21 @@ void bgt_fill_circle(int x, int y, int radius)
         return;
     }
     apply_render_color(s, s.color);
+    const int row_count = 2 * radius + 1;
+    SDL_FRect *rects = static_cast<SDL_FRect *>(
+        SDL_stack_alloc(SDL_FRect, row_count));
+    int idx = 0;
     for (int dy = -radius; dy <= radius; ++dy) {
         const double normalized_y =
             static_cast<double>(dy) / static_cast<double>(radius);
-        const int span = static_cast<int>(std::floor(
+        const int span = static_cast<int>(std::lround(
             radius * std::sqrt(1.0 - (normalized_y * normalized_y))));
-        draw_hline(s, x - span, x + span, y + dy);
+        rects[idx++] = SDL_FRect{
+            static_cast<float>(x - span), static_cast<float>(y + dy),
+            static_cast<float>(2 * span + 1), 1.0F};
     }
+    SDL_RenderFillRects(s.renderer, rects, row_count);
+    SDL_stack_free(rects);
 }
 
 void bgt_draw_ellipse(int x, int y, int radius_x, int radius_y)
@@ -952,23 +1067,70 @@ void bgt_draw_ellipse(int x, int y, int radius_x, int radius_y)
         return;
     }
     apply_render_color(s, s.color);
-    const int steps = std::max(24, (radius_x + radius_y) * 3);
-    int previous_x = x + radius_x;
-    int previous_y = y;
-    for (int step = 1; step <= steps; ++step) {
-        const double angle =
-            (static_cast<double>(step) * kTwoPi) / static_cast<double>(steps);
-        const int next_x =
-            x + static_cast<int>(std::lround(std::cos(angle) * radius_x));
-        const int next_y =
-            y + static_cast<int>(std::lround(std::sin(angle) * radius_y));
-        SDL_RenderLine(s.renderer, static_cast<float>(previous_x),
-                       static_cast<float>(previous_y),
-                       static_cast<float>(next_x), static_cast<float>(next_y));
-        previous_x = next_x;
-        previous_y = next_y;
+    const int line_width = std::max(1, s.line_width);
+
+    if (line_width <= 1) {
+        // 1px：采样折线，一次 SDL_RenderLines 绘制
+        const int steps = std::max(24, (radius_x + radius_y) * 3);
+        const int pt_count = steps + 1;
+        SDL_FPoint *pts = static_cast<SDL_FPoint *>(
+            SDL_stack_alloc(SDL_FPoint, pt_count));
+        for (int step = 0; step <= steps; ++step) {
+            const double angle =
+                (static_cast<double>(step) * kTwoPi) / static_cast<double>(steps);
+            pts[step] = SDL_FPoint{
+                static_cast<float>(x + std::lround(std::cos(angle) * radius_x)),
+                static_cast<float>(y + std::lround(std::sin(angle) * radius_y))};
+        }
+        SDL_RenderLines(s.renderer, pts, pt_count);
+        SDL_stack_free(pts);
+    } else {
+        // 粗线：扫描线填充环形区域（外椭圆 - 内椭圆），无间隙
+        const int outer_rx = radius_x + (line_width + 1) / 2;
+        const int outer_ry = radius_y + (line_width + 1) / 2;
+        const int inner_rx = radius_x - line_width / 2;
+        const int inner_ry = radius_y - line_width / 2;
+
+        if (inner_rx <= 0 || inner_ry <= 0) {
+            // 线宽 >= 短轴：填充整个外椭圆
+            bgt_fill_ellipse(x, y, outer_rx, outer_ry);
+            return;
+        }
+
+        const int row_count = 2 * outer_ry + 1;
+        // 每行最多 2 个 rect（左半环 + 右半环）
+        SDL_FRect *rects = static_cast<SDL_FRect *>(
+            SDL_stack_alloc(SDL_FRect, row_count * 2));
+        int idx = 0;
+        for (int dy = -outer_ry; dy <= outer_ry; ++dy) {
+            const double oy = static_cast<double>(dy) / outer_ry;
+            const int outer_span = static_cast<int>(std::lround(
+                outer_rx * std::sqrt(1.0 - oy * oy)));
+            if (std::abs(dy) <= inner_ry) {
+                const double iy = static_cast<double>(dy) / inner_ry;
+                const int inner_span = static_cast<int>(std::lround(
+                    inner_rx * std::sqrt(1.0 - iy * iy)));
+                const int left_w = outer_span - inner_span;
+                if (left_w > 0) {
+                    rects[idx++] = SDL_FRect{
+                        static_cast<float>(x - outer_span),
+                        static_cast<float>(y + dy),
+                        static_cast<float>(left_w), 1.0F};
+                    rects[idx++] = SDL_FRect{
+                        static_cast<float>(x + inner_span + 1),
+                        static_cast<float>(y + dy),
+                        static_cast<float>(left_w), 1.0F};
+                }
+            } else {
+                rects[idx++] = SDL_FRect{
+                    static_cast<float>(x - outer_span),
+                    static_cast<float>(y + dy),
+                    static_cast<float>(2 * outer_span + 1), 1.0F};
+            }
+        }
+        SDL_RenderFillRects(s.renderer, rects, idx);
+        SDL_stack_free(rects);
     }
-    apply_render_color(s, s.color);
 }
 
 void bgt_fill_ellipse(int x, int y, int radius_x, int radius_y)
@@ -978,20 +1140,165 @@ void bgt_fill_ellipse(int x, int y, int radius_x, int radius_y)
         return;
     }
     apply_render_color(s, s.color);
+    const int row_count = 2 * radius_y + 1;
+    SDL_FRect *rects = static_cast<SDL_FRect *>(
+        SDL_stack_alloc(SDL_FRect, row_count));
+    int idx = 0;
     for (int dy = -radius_y; dy <= radius_y; ++dy) {
         const double normalized_y =
             static_cast<double>(dy) / static_cast<double>(radius_y);
         const int span = static_cast<int>(std::lround(
             radius_x * std::sqrt(1.0 - (normalized_y * normalized_y))));
-        draw_hline(s, x - span, x + span, y + dy);
+        rects[idx++] = SDL_FRect{
+            static_cast<float>(x - span), static_cast<float>(y + dy),
+            static_cast<float>(2 * span + 1), 1.0F};
     }
+    SDL_RenderFillRects(s.renderer, rects, row_count);
+    SDL_stack_free(rects);
 }
 
 void bgt_draw_triangle(int x1, int y1, int x2, int y2, int x3, int y3)
 {
-    bgt_draw_line(x1, y1, x2, y2);
-    bgt_draw_line(x2, y2, x3, y3);
-    bgt_draw_line(x3, y3, x1, y1);
+    State &s = state();
+    if (!ensure_open(s)) {
+        return;
+    }
+    apply_render_color(s, s.color);
+
+    if (s.line_width <= 1) {
+        // 1px：用 SDL_RenderLines 画闭合折线，避免角点重复绘制
+        SDL_FPoint tri_pts[4] = {
+            {static_cast<float>(x1), static_cast<float>(y1)},
+            {static_cast<float>(x2), static_cast<float>(y2)},
+            {static_cast<float>(x3), static_cast<float>(y3)},
+            {static_cast<float>(x1), static_cast<float>(y1)},
+        };
+        SDL_RenderLines(s.renderer, tri_pts, 4);
+    } else {
+        // 粗线：miter join —— 算出 6 个偏移顶点，填充 3 条边的矩形带
+        const double p1x = static_cast<double>(x1);
+        const double p1y = static_cast<double>(y1);
+        const double p2x = static_cast<double>(x2);
+        const double p2y = static_cast<double>(y2);
+        const double p3x = static_cast<double>(x3);
+        const double p3y = static_cast<double>(y3);
+
+        // 三条边的方向向量
+        const double e1x = p2x - p1x;
+        const double e1y = p2y - p1y;
+        const double e2x = p3x - p2x;
+        const double e2y = p3y - p2y;
+        const double e3x = p1x - p3x;
+        const double e3y = p1y - p3y;
+
+        const double len1 = std::sqrt(e1x * e1x + e1y * e1y);
+        const double len2 = std::sqrt(e2x * e2x + e2y * e2y);
+        const double len3 = std::sqrt(e3x * e3x + e3y * e3y);
+
+        if (len1 < 0.5 || len2 < 0.5 || len3 < 0.5) {
+            // 退化：有边太短， fallback 到独立粗线
+            bgt_draw_line(x1, y1, x2, y2);
+            bgt_draw_line(x2, y2, x3, y3);
+            bgt_draw_line(x3, y3, x1, y1);
+            return;
+        }
+
+        // 共线检查：三点共线时偏移线全部平行，无法形成 miter
+        const Point a{x1, y1};
+        const Point b{x2, y2};
+        const Point c{x3, y3};
+        if (edge_value(a, b, c) == 0) {
+            bgt_draw_line(x1, y1, x2, y2);
+            bgt_draw_line(x2, y2, x3, y3);
+            bgt_draw_line(x3, y3, x1, y1);
+            return;
+        }
+
+        // 三条边的垂直方向（单位法向量）
+        const double n1x = -e1y / len1;
+        const double n1y =  e1x / len1;
+        const double n2x = -e2y / len2;
+        const double n2y =  e2x / len2;
+        const double n3x = -e3y / len3;
+        const double n3y =  e3x / len3;
+
+        const double half = static_cast<double>(s.line_width) / 2.0;
+
+        // 每条边偏移 +half / -half 得到平行线，相邻边的同侧偏移线求交得到 miter point
+        // pts[0..2]: +half 侧（分别在顶点 P1, P2, P3 处）
+        // pts[3..5]: -half 侧（分别在顶点 P1, P2, P3 处）
+
+        const double o1px = p1x + n1x * half;
+        const double o1py = p1y + n1y * half;
+        const double o2px = p2x + n2x * half;
+        const double o2py = p2y + n2y * half;
+        const double o3px = p3x + n3x * half;
+        const double o3py = p3y + n3y * half;
+
+        const double i1px = p1x - n1x * half;
+        const double i1py = p1y - n1y * half;
+        const double i2px = p2x - n2x * half;
+        const double i2py = p2y - n2y * half;
+        const double i3px = p3x - n3x * half;
+        const double i3py = p3y - n3y * half;
+
+        PointD pts[6];
+        pts[0] = line_intersection(o3px, o3py, e3x, e3y,
+                                    o1px, o1py, e1x, e1y);
+        pts[1] = line_intersection(o1px, o1py, e1x, e1y,
+                                    o2px, o2py, e2x, e2y);
+        pts[2] = line_intersection(o2px, o2py, e2x, e2y,
+                                    o3px, o3py, e3x, e3y);
+        pts[3] = line_intersection(i3px, i3py, e3x, e3y,
+                                    i1px, i1py, e1x, e1y);
+        pts[4] = line_intersection(i1px, i1py, e1x, e1y,
+                                    i2px, i2py, e2x, e2y);
+        pts[5] = line_intersection(i2px, i2py, e2x, e2y,
+                                    i3px, i3py, e3x, e3y);
+
+        // Miter limit：当 miter point 离顶点超过 2*line_width 时，回退到该
+        // 顶点本身（bevel join 的效果），防止极尖角产生巨大尖刺。
+        const double miter_limit = 2.0 * s.line_width;
+        const double vertices_xyz[6][2] = {
+            {p1x, p1y}, {p2x, p2y}, {p3x, p3y},
+            {p1x, p1y}, {p2x, p2y}, {p3x, p3y},
+        };
+        for (int i = 0; i < 6; ++i) {
+            const double vx = vertices_xyz[i][0];
+            const double vy = vertices_xyz[i][1];
+            const double dx = pts[i].x - vx;
+            const double dy = pts[i].y - vy;
+            const double dist = std::sqrt(dx * dx + dy * dy);
+            if (dist > miter_limit) {
+                pts[i].x = vx + dx * (miter_limit / dist);
+                pts[i].y = vy + dy * (miter_limit / dist);
+            }
+        }
+
+        // 6 个顶点、6 个三角形（3 条 quad 各拆 2 个），一次 SDL_RenderGeometry
+        SDL_Vertex verts[6];
+        const SDL_Color col = to_sdl_color(s.color);
+        const float inv255 = 1.0F / 255.0F;
+        for (int i = 0; i < 6; ++i) {
+            verts[i].position.x = static_cast<float>(pts[i].x);
+            verts[i].position.y = static_cast<float>(pts[i].y);
+            verts[i].color.r = static_cast<float>(col.r) * inv255;
+            verts[i].color.g = static_cast<float>(col.g) * inv255;
+            verts[i].color.b = static_cast<float>(col.b) * inv255;
+            verts[i].color.a = static_cast<float>(col.a) * inv255;
+            verts[i].tex_coord.x = 0.0F;
+            verts[i].tex_coord.y = 0.0F;
+        }
+        // quad1: 0,1,4,3 → 三角形 (0,1,4) + (0,4,3)
+        // quad2: 1,2,5,4 → 三角形 (1,2,5) + (1,5,4)
+        // quad3: 2,0,3,5 → 三角形 (2,0,3) + (2,3,5)
+        const int indices[] = {
+            0, 1, 4,  0, 4, 3,   // quad1
+            1, 2, 5,  1, 5, 4,   // quad2
+            2, 0, 3,  2, 3, 5,   // quad3
+        };
+        SDL_RenderGeometry(s.renderer, nullptr, verts, 6, indices, 18);
+    }
 }
 
 void bgt_fill_triangle(int x1, int y1, int x2, int y2, int x3, int y3)
@@ -1000,7 +1307,6 @@ void bgt_fill_triangle(int x1, int y1, int x2, int y2, int x3, int y3)
     if (!ensure_open(s)) {
         return;
     }
-    apply_render_color(s, s.color);
     const Point a{x1, y1};
     const Point b{x2, y2};
     const Point c{x3, y3};
@@ -1008,26 +1314,13 @@ void bgt_fill_triangle(int x1, int y1, int x2, int y2, int x3, int y3)
         bgt_draw_triangle(x1, y1, x2, y2, x3, y3);
         return;
     }
-    const int min_x = std::min({x1, x2, x3});
-    const int max_x = std::max({x1, x2, x3});
-    const int min_y = std::min({y1, y2, y3});
-    const int max_y = std::max({y1, y2, y3});
-    const Point reference{(x1 + x2 + x3) / 3, (y1 + y2 + y3) / 3};
-    const int edge_ab_reference = edge_value(a, b, reference);
-    const int edge_bc_reference = edge_value(b, c, reference);
-    const int edge_ca_reference = edge_value(c, a, reference);
-
-    for (int y = min_y; y <= max_y; ++y) {
-        for (int x = min_x; x <= max_x; ++x) {
-            const Point p{x, y};
-            if (same_sign_or_zero(edge_value(a, b, p), edge_ab_reference) &&
-                same_sign_or_zero(edge_value(b, c, p), edge_bc_reference) &&
-                same_sign_or_zero(edge_value(c, a, p), edge_ca_reference)) {
-                SDL_RenderPoint(s.renderer, static_cast<float>(x),
-                                static_cast<float>(y));
-            }
-        }
-    }
+    // 非退化：三个顶点直接交给 GPU 光栅化填充
+    PointD pts[3] = {
+        {static_cast<double>(x1), static_cast<double>(y1)},
+        {static_cast<double>(x2), static_cast<double>(y2)},
+        {static_cast<double>(x3), static_cast<double>(y3)},
+    };
+    fill_convex_polygon(s, pts, 3);
 }
 
 void bgt_set_line_width(int width)
