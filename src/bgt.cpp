@@ -754,6 +754,10 @@ bool open_window_impl(int width, int height, const char title[],
 
     // 先切到画布，再设逻辑坐标：logical presentation 绑定在当前 render target 上，
     // 这样 800×600 的逻辑坐标会映射到画布的 1600×1200 像素
+    SDL_SetRenderTarget(s.renderer, nullptr);
+    SDL_SetRenderLogicalPresentation(
+        s.renderer, width, height, SDL_LOGICAL_PRESENTATION_STRETCH);
+
     SDL_SetRenderTarget(s.renderer, s.canvas);
     SDL_SetRenderLogicalPresentation(s.renderer, width, height,
                                      SDL_LOGICAL_PRESENTATION_STRETCH);
