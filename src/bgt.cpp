@@ -658,6 +658,10 @@ void draw_text_impl(State &s, int x, int y, const char text[], int size)
         return;
     }
 
+    if (color_a(s.color) == 0) {
+        return;
+    }
+
     TTF_Font *font = get_font(s, size);
     if (font == nullptr) {
         return;
