@@ -377,6 +377,9 @@ BGT_USE_SYSTEM_SDL
 - 可通过 `bgt_print_error()` 将最近错误打印到控制台。
 - 可通过 `bgt_draw_error(x, y, size)` 将最近错误绘制到窗口里。
 - 可通过 `bgt_clear_error()` 清除错误状态。
+- v0.3 起错误保留最近 10 条历史：`bgt_error_count()` 数条数，
+  `bgt_error_code(index)` / `bgt_error_text(index, out, size)` 按序号查询
+  （0 最老）；无参形态等价于取最新一条。
 
 说明：
 
@@ -404,9 +407,10 @@ libbgt/
     03_text.cpp
     04_input.cpp
     05_transparency.cpp
-    06_sudoku.cpp
-    07_hanoi.cpp
-    08_api_tour.cpp
+    06_api_tour.cpp
+  demo/
+    01_sudoku.cpp
+    02_hanoi.cpp
   third_party/
     SDL/
     SDL_ttf/
@@ -414,17 +418,21 @@ libbgt/
 
 ## 14. 示例规划
 
-首批示例应当从低到高排列：
+首批程序按职责分两个目录：`examples/` 放功能示例（演示某一组 API 的用法），
+`demo/` 放完整游戏（自成一体的可玩程序）。两个目录各自从 01 起编号：
 
 ```text
-01_hello.cpp           窗口与第一个图形
-02_shapes.cpp          基本图形绘制
-03_text.cpp            文本与中文显示
-04_input.cpp           键盘与鼠标输入
-05_transparency.cpp    透明与颜色混合
-06_sudoku.cpp          综合小游戏（数独）
-07_hanoi.cpp           汉诺塔演示（三态流程 + 递归自动求解）
-08_api_tour.cpp        面向初学者的板块式 API 速查（可作课堂讲义直接分发）
+examples/01_hello.cpp           窗口与第一个图形
+examples/02_shapes.cpp          基本图形绘制
+examples/03_text.cpp             文本与中文显示
+examples/04_input.cpp            键盘与鼠标输入
+examples/05_transparency.cpp    透明与颜色混合
+demo/01_sudoku.cpp               综合小游戏（数独）
+demo/02_hanoi.cpp                汉诺塔演示（三态流程 + 递归自动求解）
+demo/03_breakout.cpp             打砖块（碰撞 + 音效，实时循环）
+demo/04_minesweeper.cpp          扫雷（随机 + 存档，回合策略）
+demo/05_shooter.cpp              太空射击（图片/随机/碰撞/存档/声音综合门面）
+examples/06_api_tour.cpp        面向初学者的板块式 API 速查（可作课堂讲义直接分发）
 ```
 
 示例原则：
@@ -443,7 +451,6 @@ libbgt/
 - 图片缩放。
 - 简单碰撞检测。
 - 随机数。
-- 更多示例小游戏。
 
 可能的 `v0.3` 内容：
 
@@ -520,7 +527,7 @@ libbgt/
 - `include/bgt.h`
 - `src/bgt.cpp`
 - `CMakeLists.txt`
-- `examples/` 下的 8 个示例（`01_hello.cpp` 到 `08_api_tour.cpp`）
+- `examples/` 与 `demo/` 下的 8 个首批程序（`examples/` 01–06 与 `demo/` 01–02）
 
 实现范围与 `docs/api-v0.md` 保持一致。文本绘制默认使用系统自带中文字体，
 不依赖仓库内的字体文件。
@@ -532,3 +539,25 @@ v0.2 图片子系统已实现：`third_party/SDL_image` submodule、图片加载
 （`BGT_BUILD_TESTS`）。v0.2 碰撞检测已实现：矩形、圆、点两两组合的
 五个 `bgt_hit_*` 纯几何函数（见 `docs/api-v0.2.md`），配套显式检查
 测试（`BGT_BUILD_TESTS`）。
+
+v0.3 文件存档已实现：节-键-值文本存档接口 `bgt_load`/`bgt_save`/
+`bgt_file_exists` 与三类型读写 `bgt_set_*`/`bgt_get_*`（见
+`docs/api-v0.3.md`），存档为记事本可读可改的 INI 风格文本，配套显式
+检查测试（`BGT_BUILD_TESTS`）。
+
+v0.3 声音播放已实现：音效（`bgt_load_sound`/`bgt_play_sound`/
+`bgt_set_sound_volume`，可多声重叠）与背景音乐（`bgt_play_music`/
+`bgt_stop_music`/`bgt_set_music_volume`，流式、默认循环）两类接口（见
+`docs/api-v0.3.md`），基于 SDL_mixer 3.x 子模块，配套显式检查测试
+（`BGT_BUILD_TESTS`）与代码合成的音频资产（`examples/make_sound_assets.py`）。
+
+v0.3 错误诊断已实现：错误保留最近 10 条历史（环形队列），按序号查询
+错误码与文本（`bgt_error_count` / `bgt_error_code(index)` /
+`bgt_error_text`），`bgt_draw_error` 支持按序号绘制并自动按窗口宽度
+换行；v0.1 的无参用法由薄转调层保持不变（见 `docs/api-v0.3.md`），
+配套显式检查测试（`BGT_BUILD_TESTS`）。
+
+v0.3 demo 题库已就绪：`demo/` 新增打砖块（碰撞 + 音效）、扫雷（随机 +
+存档）、太空射击（v0.2/v0.3 API 综合门面）三个完整游戏，资产由
+`demo/make_game_assets.py` 零版权合成；作业题库 `docs/exercises.md`
+重构为每游戏一节模板（总览表 + 分步引导 + 验收点 + 参考实现）。

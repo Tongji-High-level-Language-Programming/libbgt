@@ -122,6 +122,8 @@
 #define BGT_ERROR_FONT 5
 #define BGT_ERROR_NOT_OPEN 6
 #define BGT_ERROR_IMAGE 7
+#define BGT_ERROR_STORAGE 8
+#define BGT_ERROR_AUDIO 9
 
 // 创建一个固定大小的图形窗口，并初始化 libbgt 内部需要的 SDL3 与
 // SDL3_ttf 资源。width 和 height 是窗口的逻辑绘图尺寸，title 是窗口标题，
@@ -400,22 +402,120 @@ bool bgt_hit_circle_circle(int x1, int y1, int radius1, int x2, int y2,
 bool bgt_hit_circle_rect(int cx, int cy, int radius, int x, int y,
                          int width, int height);
 
-// 判断库内部是否记录了错误。通常在某个返回 false 的函数之后调用。
+// 把存档文件读入内存存档表，之前内存表里的内容会被整体替换。存档文件是
+// 普通文本文件，每一行是“键=值”，并用 [节名] 行把键分组，可以用记事本
+// 直接打开查看或修改。filename 是文件名，通常写 "save.txt" 这样的相对
+// 路径。文件不存在时不会出错：内存表变为空表并返回 true，适合游戏第一
+// 次运行的情况。成功返回 true；文件存在但读不开、或里面有格式不对的行
+// 时返回 false 并记录错误（格式不对的行会被跳过，其他行照常读入）。
+bool bgt_load(const char filename[]);
+
+// 把内存存档表写入存档文件。之前用 bgt_set_int() 等函数放进表里的数据
+// 会一次性全部写入。库会先写一个临时文件、成功后再替换存档文件，避免
+// 写一半把旧存档弄坏。成功返回 true；失败返回 false 并记录错误。
+bool bgt_save(const char filename[]);
+
+// 判断文件是否存在。常用于判断是不是第一次运行，例如
+// if (!bgt_file_exists("save.txt")) { ... }。
+bool bgt_file_exists(const char filename[]);
+
+// 在内存存档表中写入一个整数。section 是节名，key 是键名，例如
+// bgt_set_int("最高分", "best", 100)。同一个 (节, 键) 已有值时会被覆盖。
+void bgt_set_int(const char section[], const char key[], int value);
+
+// 在内存存档表中写入一个小数，用法与 bgt_set_int() 相同。
+void bgt_set_double(const char section[], const char key[], double value);
+
+// 在内存存档表中写入一个字符串，value 可以直接写中文字符串字面量，例如
+// bgt_set_string("玩家", "name", "张三")。字符串首尾的空白会被去掉；
+// 去掉首尾空白后仍含换行的字符串会记录错误、不存入。
+void bgt_set_string(const char section[], const char key[], const char value[]);
+
+// 从内存存档表中读取一个整数。节或键不存在时返回 default_value，不会
+// 出错。键里存的值必须能按整数理解：如果存的是 45.5 这样的小数文本，
+// 就读不出来，返回 default_value 并记录错误。
+int bgt_get_int(const char section[], const char key[], int default_value);
+
+// 从内存存档表中读取一个小数。整数文本可以按小数读出（存 100 能读出
+// 100.0），反向不行。节或键不存在时返回 default_value，不会出错。
+double bgt_get_double(const char section[], const char key[],
+                      double default_value);
+
+// 从内存存档表中读取一个字符串，写进 out 数组。out_size 是 out 的大小，
+// 例如 char name[32]; bgt_get_string("玩家", "name", name, 32, "无名");
+// 节或键不存在时写入 default_value。字符串加结束符放不进 out_size 时，
+// 只写入放得下的部分（保证是完整的中文）并记录错误。
+void bgt_get_string(const char section[], const char key[],
+                    char out[], int out_size, const char default_value[]);
+
+// 从文件加载一段音效（WAV/OGG/MP3 都可以），返回声音编号。编号大于 0 表示
+// 成功；加载失败返回 0 并记录错误，此时可以调用 bgt_print_error() 查看原因。
+// 音效会一直留在内存里，关闭窗口或程序退出时统一清理，
+// 不需要（也没有）释放函数。
+// 通常在程序开头把所有音效加载完，存进 int 变量备用。
+int bgt_load_sound(const char filename[]);
+
+// 播放一次编号对应的音效。连按连响：每次调用都是一次新的发声，多个音效
+// 会自动混音重叠。id 无效（0 或没加载过）时记录错误，不播放。
+void bgt_play_sound(int id);
+
+// 设置某个音效的音量，volume 取 0 到 100：0 静音，100 最大，超出范围的值
+// 会被收到边界。影响这个音效之后每次播放的音量；正在响的发声不会变。
+void bgt_set_sound_volume(int id, int volume);
+
+// 播放一段背景音乐（WAV/OGG/MP3 都可以），默认无限循环。整个程序同一时刻
+// 只有一首音乐：正在播放时再调用本函数会自动切到新曲子。音乐是流式播放的，
+// 内存占用和音乐文件长度无关。成功返回 true；文件不存在、格式不支持等
+// 失败返回 false 并记录错误。
+bool bgt_play_music(const char filename[]);
+
+// 停止背景音乐。没有音乐在播时调用它没有任何效果，也不报错。
+void bgt_stop_music();
+
+// 设置背景音乐的音量，0 到 100，规则与音效音量相同。立即生效。
+void bgt_set_music_volume(int volume);
+
+// 判断库内部是否记录了错误（错误历史里有至少一条）。通常在某个返回
+// false 的函数之后调用。
 bool bgt_has_error();
 
-// 返回最近一次错误的错误码。错误码是 BGT_ERROR_* 常量；没有错误时返回
-// BGT_ERROR_NONE。
+// 返回错误历史中的条数。历史最多保留 10 条：更早的错误会被最老的挤出。
+// bgt_clear_error() 会清空全部历史。
+int bgt_error_count();
+
+// 按序号返回历史中某条错误的错误码：0 是最老的一条，
+// bgt_error_count() - 1 是最新的一条。错误码是 BGT_ERROR_* 常量。
+// 序号越界（含历史为空）时返回 BGT_ERROR_NONE（0），不会产生新错误。
+int bgt_error_code(int index);
+
+// 返回最新一条错误的错误码；历史为空时返回 BGT_ERROR_NONE。
+// 等价于 bgt_error_code(bgt_error_count() - 1)。
 int bgt_error_code();
 
-// 把最近一次错误信息打印到标准错误输出。这个函数主要用于调试和示例程序中的
-// 简单错误报告。
+// 按序号把历史中某条错误的消息文本复制进 out 数组：最多放 out_size - 1
+// 个字节加结束符，放不下时按 UTF-8 字符边界安全截断。序号越界时 out 得到
+// 空串。查询不产生新错误，截断也是静默的。
+void bgt_error_text(int index, char out[], int out_size);
+
+// 把历史中第 index 条错误打印到标准错误输出，格式与库的报告一致。
+// 序号越界时什么都不打印。
+void bgt_print_error(int index);
+
+// 把最新一条错误信息打印到标准错误输出。这个函数主要用于调试和示例
+// 程序中的简单错误报告。等价于 bgt_print_error(bgt_error_count() - 1)。
 void bgt_print_error();
 
-// 把最近一次错误信息绘制到窗口中。(x, y) 是文字左上角，size 是字号。绘制颜色
-// 使用当前绘图颜色。
+// 把历史中第 index 条错误绘制到窗口中。(x, y) 是文字左上角，size 是
+// 字号，绘制颜色使用当前绘图颜色。消息太长时会自动按窗口宽度换行，
+// 逐行向下画。序号越界时什么都不画。
+void bgt_draw_error(int x, int y, int size, int index);
+
+// 把最新一条错误信息绘制到窗口中。等价于
+// bgt_draw_error(x, y, size, bgt_error_count() - 1)。
 void bgt_draw_error(int x, int y, int size);
 
-// 清除最近一次错误码和错误信息。清除后 bgt_has_error() 会返回 false。
+// 清除全部错误历史。清除后 bgt_has_error() 返回 false、
+// bgt_error_count() 返回 0。
 void bgt_clear_error();
 
 // NOLINTEND(readability-magic-numbers, modernize-avoid-c-arrays,

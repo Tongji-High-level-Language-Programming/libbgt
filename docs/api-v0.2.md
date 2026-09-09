@@ -11,8 +11,8 @@ v0.1 的基础接口（窗口、图形、文本、输入、时间、错误信息
 [api-v0.md](api-v0.md)。
 
 图片解码由随仓库提供的 SDL3_image 子模块完成，默认静态链接进示例程序，
-运行时不需要附带额外的 DLL。图片完整示例见 `examples/09_images.cpp`，随机数完整示例见
-`examples/10_random.cpp`，碰撞检测完整示例见 `examples/11_collision.cpp`。
+运行时不需要附带额外的 DLL。图片完整示例见 `examples/07_images.cpp`，随机数完整示例见
+`examples/08_random.cpp`，碰撞检测完整示例见 `examples/09_collision.cpp`。
 
 ## 1. RST 变换模型
 
@@ -341,7 +341,7 @@ double bgt_random(double min, double max);
 随机小数**，区间都是半开区间 [min, max)：包含 min，不包含 max。
 
 随机数不依赖窗口：即使没有打开窗口，也可以直接调用这些函数（做
-命令行练习、生成测试数据时很有用）。完整示例见 `examples/10_random.cpp`。
+命令行练习、生成测试数据时很有用）。完整示例见 `examples/08_random.cpp`。
 
 ### `bgt_random`（整数版）
 
@@ -485,7 +485,7 @@ bool bgt_hit_circle_rect(int cx, int cy, int radius,
 
 碰撞函数是纯几何计算，不依赖窗口（不开窗也能调用）；退化形状（宽、高或
 半径小于等于 0）永远不命中，也不会记录错误。完整示例见
-`examples/11_collision.cpp`。
+`examples/09_collision.cpp`。
 
 ### `bgt_hit_point_rect`
 

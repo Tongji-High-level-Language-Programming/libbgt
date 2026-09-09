@@ -12,8 +12,8 @@
 - 默认只管理一个窗口和一张隐式画布。
 - 中文显示开箱可用，默认使用系统中文字体。
 - 项目使用 CMake 构建。
-- SDL3 与 SDL3_ttf 通过 Git Submodule 管理。
-- SDL3、SDL3_ttf 及其字体依赖默认静态链接，生成的示例程序无需附带 SDL DLL。
+- SDL3、SDL3_ttf、SDL3_image 与 SDL3_mixer 通过 Git Submodule 管理。
+- SDL3、SDL3_ttf、SDL3_image、SDL3_mixer 及其解码依赖默认静态链接，生成的示例程序无需附带 SDL DLL。
 - 首版只提供低层、直观的基础能力，不提供网格、场景、按钮等高阶封装。
 
 ## 最小示例
@@ -65,7 +65,7 @@ cmake -S . -B build
 cmake --build build
 ```
 
-默认把 `libbgt` 编译为静态库，并构建全部 11 个示例程序。
+默认把 `libbgt` 编译为静态库，并构建全部 14 个示例与演示程序。
 
 ### 3. 运行示例
 
@@ -85,7 +85,10 @@ cmake --build build
 ```
 
 先运行 `bgt_hello` 确认环境正常，再运行 `bgt_hanoi`（汉诺塔演示：三态流程、
-手动游玩与递归自动求解，配套作业见[作业设计](docs/exercises.md)）。
+手动游玩与递归自动求解，配套作业见[作业题库](docs/exercises.md)）。
+
+带配套文件的程序（如 `demo/01_sudoku` 的谜题文本、`examples/11_sound` 的
+合成音效）要从可执行文件所在目录运行——构建时这些文件已经复制到同一目录。
 
 ## 常用配置项
 
@@ -95,7 +98,7 @@ cmake --build build
 | `BGT_BUILD_TESTS` | `OFF` | 编译纯函数测试（显式检查，用 ctest 运行） |
 | `BGT_BUILD_SHARED` | `OFF` | 编译为共享库（默认静态） |
 | `BGT_BUILD_VENDORED` | `OFF` | MSVC 下把库与依赖合并为单个 `bgt_vendored.lib`（见下文） |
-| `BGT_USE_SYSTEM_SDL` | `OFF` | 使用系统安装的 SDL3 / SDL3_ttf 包 |
+| `BGT_USE_SYSTEM_SDL` | `OFF` | 使用系统安装的 SDL3 / SDL3_ttf / SDL3_image / SDL3_mixer 包 |
 
 如改用系统安装的依赖，请确保其同时提供静态 CMake 目标，然后配置
 `-DBGT_USE_SYSTEM_SDL=ON`。
@@ -111,6 +114,7 @@ libbgt/
     api-v0.md
     exercises.md
     api-v0.2.md
+    api-v0.3.md
   include/
     bgt.h
   src/
@@ -121,36 +125,66 @@ libbgt/
     03_text.cpp
     04_input.cpp
     05_transparency.cpp
-    06_sudoku.cpp
-    06_sudoku_puzzle.txt
-    07_hanoi.cpp
-    08_api_tour.cpp
-    09_images.cpp
-    09_image.png
-    10_random.cpp
-    11_collision.cpp
+    06_api_tour.cpp
+    07_images.cpp
+    07_image.png
+    08_random.cpp
+    09_collision.cpp
+    10_storage.cpp
+    11_sound.cpp
+    11_jump.wav
+    11_ding.wav
+    11_boom.wav
+    11_melody.wav
+    make_sound_assets.py
+    12_errors.cpp
+  demo/
+    01_sudoku.cpp
+    01_sudoku_puzzle.txt
+    02_hanoi.cpp
+    03_breakout.cpp
+    03_bounce.wav
+    03_brick.wav
+    03_lose.wav
+    03_win.wav
+    04_minesweeper.cpp
+    04_mine.wav
+    04_win.wav
+    05_shooter.cpp
+    05_shoot.wav
+    05_boom.wav
+    05_lose.wav
+    05_bgm.wav
+    05_ship.png
+    05_enemy.png
+    make_game_assets.py
   tests/
     test_random.cpp
     test_collision.cpp
+    test_storage.cpp
+    test_sound.cpp
+    test_errors.cpp
   third_party/
     SDL/
     SDL_ttf/
     SDL_image/
+    SDL_mixer/
 ```
 
-当前仓库包含首版基础 API 实现、CMake 构建脚本和 11 个示例程序。文本绘制默认
+当前仓库包含首版基础 API 实现、CMake 构建脚本、12 个功能示例（`examples/`）
+与 5 个完整游戏演示（`demo/`）。文本绘制默认
 使用系统自带的中文字体（Windows 下通常是微软雅黑），不依赖仓库内的字体文件；
 系统缺少中文字体时，可以用 `bgt_set_font()` 指定可用字体。
 
 ## 依赖管理
 
-SDL3、SDL3_ttf 与 SDL3_image 通过 Git Submodule 管理，使用者克隆后初始化
+SDL3、SDL3_ttf、SDL3_image 与 SDL3_mixer 通过 Git Submodule 管理，使用者克隆后初始化
 子模块即可（命令见[快速开始](#快速开始)）。
 
 ## MSVC 二进制分发
 
-面向 Visual Studio 使用者时，可以把 libbgt、SDL3、SDL3_ttf、SDL3_image 及其
-依赖的静态库合并为一个 `bgt_vendored.lib`。使用者不需要复制或链接 SDL DLL：
+面向 Visual Studio 使用者时，可以把 libbgt、SDL3、SDL3_ttf、SDL3_image、
+SDL3_mixer 及其依赖的静态库合并为一个 `bgt_vendored.lib`。使用者不需要复制或链接 SDL DLL：
 
 ```powershell
 cmake -S . -B build-dist -G "Visual Studio 18 2026" -A x64 `
@@ -178,8 +212,9 @@ package/
 
 - [设计文档](docs/design.md)
 - [首版 API 文档](docs/api-v0.md)
-- [作业设计（汉诺塔主题）](docs/exercises.md)
+- [作业题库（汉诺塔/打砖块/扫雷/太空射击）](docs/exercises.md)
 - [v0.2 API 文档（图片、随机数、碰撞检测）](docs/api-v0.2.md)
+- [v0.3 API 文档（文件存档、声音播放、错误诊断）](docs/api-v0.3.md)
 
 ## 首版范围
 
@@ -197,7 +232,7 @@ package/
 
 - `include/bgt.h`
 - `src/bgt.cpp`
-- `examples/` 下的 8 个示例（`01_hello.cpp` 到 `08_api_tour.cpp`）
+- `examples/` 与 `demo/` 下的 8 个首批程序（`examples/` 01–06 与 `demo/` 01–02）
 
 首版暂不提供：
 

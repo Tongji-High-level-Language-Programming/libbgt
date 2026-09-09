@@ -3,15 +3,23 @@
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
 #include <SDL3_image/SDL_image.h>
+#include <SDL3_mixer/SDL_mixer.h>
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <deque>
+#include <filesystem>
+#include <fstream>
+#include <map>
 #include <random>
 #include <string>
+#include <system_error>
 #include <vector>
 
 // The implementation mirrors the beginner-facing API, where short coordinate
@@ -50,6 +58,21 @@ struct ImageEntry {
     int offset_y = 0;         // T：相对绘制位置的纵向偏移
 };
 
+// 一段已加载的音效：解码句柄 + 学生设置的音量（0-100）。
+struct SoundEntry {
+    MIX_Audio *audio = nullptr;
+    int volume = 100;
+};
+
+// 错误历史条目：错误码 + 完整消息（已拼好 SDL 原文后缀）。
+struct ErrorEntry {
+    int code = BGT_ERROR_NONE;
+    std::string message;
+};
+
+// 错误历史容量：超过后最老的条目被挤出。
+constexpr int kMaxErrorHistory = 10;
+
 struct State {
     SDL_Window *window = nullptr;
     SDL_Renderer *renderer = nullptr;
@@ -83,8 +106,17 @@ struct State {
     double delta_time = 0.0;
     double total_time = 0.0;
     double fps = 0.0;
-    int error_code = BGT_ERROR_NONE;
-    std::string error_message;
+    // v0.3 存档表：节名 → 键名 → 值的文本形式。
+    std::map<std::string, std::map<std::string, std::string>> storage;
+
+    // v0.3 声音：SDL_mixer 句柄、音效表与音乐单实例。
+    MIX_Mixer *audio_mixer = nullptr;   // 懒初始化，见 ensure_audio()
+    std::map<int, SoundEntry> sounds;   // 音效 ID → 数据
+    int next_sound_id = 1;              // 0 保留为“无效 ID”
+    std::vector<MIX_Track *> sound_tracks; // 音效轨道池（可重叠播放）
+    MIX_Track *music_track = nullptr;   // 背景音乐全局单实例
+    int music_volume = 100;             // 0-100；无实例时记忆
+    std::deque<ErrorEntry> errors; // 错误历史，最多 kMaxErrorHistory 条
 
     ~State()
     {
@@ -93,19 +125,53 @@ struct State {
 
     void clear_error()
     {
-        error_code = BGT_ERROR_NONE;
-        error_message.clear();
+        errors.clear();
         SDL_ClearError();
     }
 
     void set_error(int code, const std::string &message)
     {
-        error_code = code;
-        error_message = message;
+        ErrorEntry entry;
+        entry.code = code;
+        entry.message = message;
         const char *sdl_error = SDL_GetError();
         if (sdl_error != nullptr && sdl_error[0] != '\0') {
-            error_message += ": ";
-            error_message += sdl_error;
+            entry.message += ": ";
+            entry.message += sdl_error;
+        }
+        // SDL 错误消费掉就清：错误历史里连续两条错误时，下一条
+        // 不会再拼到这一条留下的陈旧 SDL 文本。
+        SDL_ClearError();
+        errors.push_back(entry);
+        if (static_cast<int>(errors.size()) > kMaxErrorHistory) {
+            errors.pop_front();
+        }
+    }
+
+    void close_sounds()
+    {
+        if (music_track != nullptr) {
+            MIX_DestroyTrack(music_track);
+            music_track = nullptr;
+        }
+        for (MIX_Track *track : sound_tracks) {
+            if (track != nullptr) {
+                MIX_DestroyTrack(track);
+            }
+        }
+        sound_tracks.clear();
+        for (auto &entry : sounds) {
+            if (entry.second.audio != nullptr) {
+                MIX_DestroyAudio(entry.second.audio);
+            }
+        }
+        sounds.clear();
+        next_sound_id = 1;
+        music_volume = 100;
+        if (audio_mixer != nullptr) {
+            MIX_DestroyMixer(audio_mixer);
+            audio_mixer = nullptr;
+            MIX_Quit();
         }
     }
 
@@ -139,6 +205,7 @@ struct State {
         }
         close_images();
         close_fonts();
+        close_sounds();
         if (renderer != nullptr) {
             SDL_DestroyRenderer(renderer);
             renderer = nullptr;
@@ -1839,33 +1906,737 @@ bool bgt_hit_circle_rect(int cx, int cy, int radius, int x, int y,
     return dx * dx + dy * dy < r * r;
 }
 
+// ---------------------------------------------------------------------
+// 文件存档（v0.3）：内存中的节-键-值表 + 文本存档文件。
+// “文本即真值”：内存表与存档文件都存值的文本形式，set 把值转成文本，
+// get 按类型解析文本，一条代码路径保证两边永远一致。
+// ---------------------------------------------------------------------
+namespace {
+
+// 去掉首尾的空白字符。字符串值、节名、键名都用这个规则整理，
+// 这样学生手写 key = 100 也能正确读入。
+std::string trim_copy(const std::string &text)
+{
+    const std::size_t first = text.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) {
+        return {};
+    }
+    const std::size_t last = text.find_last_not_of(" \t\r\n");
+    return text.substr(first, last - first + 1);
+}
+
+// 节名规则：非空，且不含 [、] 和换行（否则写进文件后会解析不回来）。
+bool valid_section_name(const std::string &name)
+{
+    return !name.empty() && name.find('[') == std::string::npos &&
+           name.find(']') == std::string::npos &&
+           name.find('\n') == std::string::npos;
+}
+
+// 键名规则：非空，不含 = 和换行；且首字符不能是 # 或 [——否则写盘后
+// 会被读回逻辑误判成注释行或节头，存档读不回来。
+bool valid_key_name(const std::string &name)
+{
+    return !name.empty() && name.find('=') == std::string::npos &&
+           name.find('\n') == std::string::npos &&
+           name.front() != '#' && name.front() != '[';
+}
+
+// 整理并校验节名与键名。不合法时记录错误并返回 false。
+bool storage_names(const char section[], const char key[],
+                   std::string &section_out, std::string &key_out)
+{
+    State &s = state();
+    section_out = section == nullptr ? std::string() : trim_copy(section);
+    key_out = key == nullptr ? std::string() : trim_copy(key);
+    if (!valid_section_name(section_out)) {
+        s.set_error(BGT_ERROR_STORAGE,
+                    "invalid section name: '" + section_out + "'");
+        return false;
+    }
+    if (!valid_key_name(key_out)) {
+        s.set_error(BGT_ERROR_STORAGE,
+                    "invalid key name: '" + key_out + "'");
+        return false;
+    }
+    return true;
+}
+
+// 在内存存档表中查找 (节, 键) 对应的值文本；找不到返回 nullptr。
+const std::string *find_storage_value(const std::string &section,
+                                      const std::string &key)
+{
+    State &s = state();
+    const auto section_it = s.storage.find(section);
+    if (section_it == s.storage.end()) {
+        return nullptr;
+    }
+    const auto key_it = section_it->second.find(key);
+    if (key_it == section_it->second.end()) {
+        return nullptr;
+    }
+    return &key_it->second;
+}
+
+std::string int_to_text(int value)
+{
+    return std::to_string(value);
+}
+
+// 小数用最短往返表示：45.5 存 45.5，读回来还是精确的 45.5。
+std::string double_to_text(double value)
+{
+    char buffer[64];
+    const std::to_chars_result result =
+        std::to_chars(buffer, buffer + sizeof(buffer), value);
+    return std::string(buffer, result.ptr);
+}
+
+// 全串严格解析：文本必须整体是整数，且落在 int 范围内。
+bool parse_int_text(const std::string &text, int &value_out)
+{
+    int value = 0;
+    const char *begin = text.data();
+    const char *end = begin + text.size();
+    const std::from_chars_result result = std::from_chars(begin, end, value);
+    if (result.ec != std::errc() || result.ptr != end) {
+        return false;
+    }
+    value_out = value;
+    return true;
+}
+
+// 全串严格解析小数；"120" 也能读成 120.0（整数可以当小数用）。
+bool parse_double_text(const std::string &text, double &value_out)
+{
+    double value = 0.0;
+    const char *begin = text.data();
+    const char *end = begin + text.size();
+    const std::from_chars_result result = std::from_chars(begin, end, value);
+    if (result.ec != std::errc() || result.ptr != end) {
+        return false;
+    }
+    value_out = value;
+    return true;
+}
+
+// 截断到 limit 字节内最后一个完整的 UTF-8 字符：中文不会被切一半，
+// 输出永远是合法的 UTF-8 文本。
+std::size_t utf8_prefix_length(const std::string &text, std::size_t limit)
+{
+    std::size_t length = 0;
+    while (length < text.size() && length < limit) {
+        const auto byte = static_cast<unsigned char>(text[length]);
+        std::size_t char_bytes = 1;
+        if ((byte & 0xF8U) == 0xF0U) {
+            char_bytes = 4;
+        } else if ((byte & 0xF0U) == 0xE0U) {
+            char_bytes = 3;
+        } else if ((byte & 0xE0U) == 0xC0U) {
+            char_bytes = 2;
+        }
+        if (length + char_bytes > limit || length + char_bytes > text.size()) {
+            break;
+        }
+        length += char_bytes;
+    }
+    return length;
+}
+
+} // namespace
+
+// ---------------------------------------------------------------------
+// 声音播放（v0.3）：SDL_mixer 封装。音效与背景音乐两类：
+// 音效预加载成 ID（内存驻留、可重叠并发），音乐全局单实例、流式、
+// 默认无限循环。第一次用声音时才打开音频设备（懒初始化）。
+// ---------------------------------------------------------------------
+namespace {
+
+// 同一时刻最多 32 个音效重叠（raylib 同款上限，远超教学场景需要）。
+constexpr int kMaxSoundTracks = 32;
+
+// 音量 0-100 收敛到边界（与 bgt_rgb 的 0-255 收敛同风格）。
+int clamp_volume(int volume)
+{
+    return std::clamp(volume, 0, 100);
+}
+
+// 懒初始化：第一次调用任何声音函数时打开音频设备。失败（比如没有
+// 声卡）时记录错误；程序不崩，之后的声音调用都做安全空操作。
+bool ensure_audio()
+{
+    State &s = state();
+    if (s.audio_mixer != nullptr) {
+        return true;
+    }
+    if (!MIX_Init()) {
+        s.set_error(BGT_ERROR_AUDIO, "failed to init SDL_mixer");
+        return false;
+    }
+    s.audio_mixer =
+        MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, nullptr);
+    if (s.audio_mixer == nullptr) {
+        s.set_error(BGT_ERROR_AUDIO, "failed to open audio device");
+        MIX_Quit();
+        return false;
+    }
+    // 音效轨道池：一次性建好、反复复用（官方推荐的 track 用法）。
+    for (int i = 0; i < kMaxSoundTracks; ++i) {
+        MIX_Track *track = MIX_CreateTrack(s.audio_mixer);
+        if (track == nullptr) {
+            s.set_error(BGT_ERROR_AUDIO, "failed to create sound track");
+            for (MIX_Track *created : s.sound_tracks) {
+                MIX_DestroyTrack(created);
+            }
+            s.sound_tracks.clear();
+            MIX_DestroyMixer(s.audio_mixer);
+            s.audio_mixer = nullptr;
+            MIX_Quit();
+            return false;
+        }
+        s.sound_tracks.push_back(track);
+    }
+    return true;
+}
+
+} // namespace
+
+void bgt_set_int(const char section[], const char key[], int value)
+{
+    std::string section_name;
+    std::string key_name;
+    if (!storage_names(section, key, section_name, key_name)) {
+        return;
+    }
+    state().storage[section_name][key_name] = int_to_text(value);
+}
+
+void bgt_set_double(const char section[], const char key[], double value)
+{
+    std::string section_name;
+    std::string key_name;
+    if (!storage_names(section, key, section_name, key_name)) {
+        return;
+    }
+    state().storage[section_name][key_name] = double_to_text(value);
+}
+
+void bgt_set_string(const char section[], const char key[], const char value[])
+{
+    std::string section_name;
+    std::string key_name;
+    if (!storage_names(section, key, section_name, key_name)) {
+        return;
+    }
+    const std::string text =
+        value == nullptr ? std::string() : trim_copy(value);
+    if (text.find('\n') != std::string::npos) {
+        state().set_error(
+            BGT_ERROR_STORAGE, "string value must not contain a newline");
+        return;
+    }
+    state().storage[section_name][key_name] = text;
+}
+
+int bgt_get_int(const char section[], const char key[], int default_value)
+{
+    std::string section_name;
+    std::string key_name;
+    if (!storage_names(section, key, section_name, key_name)) {
+        return default_value;
+    }
+    State &s = state();
+    const std::string *text = find_storage_value(section_name, key_name);
+    if (text == nullptr) {
+        return default_value;
+    }
+    int value = 0;
+    if (!parse_int_text(*text, value)) {
+        s.set_error(BGT_ERROR_STORAGE,
+                    "storage entry '" + section_name + "." + key_name +
+                        "' is not an integer: '" + *text + "'");
+        return default_value;
+    }
+    return value;
+}
+
+double bgt_get_double(const char section[], const char key[],
+                      double default_value)
+{
+    std::string section_name;
+    std::string key_name;
+    if (!storage_names(section, key, section_name, key_name)) {
+        return default_value;
+    }
+    State &s = state();
+    const std::string *text = find_storage_value(section_name, key_name);
+    if (text == nullptr) {
+        return default_value;
+    }
+    double value = 0.0;
+    if (!parse_double_text(*text, value)) {
+        s.set_error(BGT_ERROR_STORAGE,
+                    "storage entry '" + section_name + "." + key_name +
+                        "' is not a number: '" + *text + "'");
+        return default_value;
+    }
+    return value;
+}
+
+void bgt_get_string(const char section[], const char key[], char out[],
+                    int out_size, const char default_value[])
+{
+    State &s = state();
+    if (out == nullptr || out_size <= 0) {
+        s.set_error(BGT_ERROR_STORAGE,
+                    "string output array is missing or empty");
+        return;
+    }
+    std::string section_name;
+    std::string key_name;
+    bool found = false;
+    std::string text;
+    if (storage_names(section, key, section_name, key_name)) {
+        const std::string *stored = find_storage_value(section_name, key_name);
+        if (stored != nullptr) {
+            text = *stored;
+            found = true;
+        }
+    }
+    if (!found) {
+        text = default_value == nullptr ? std::string() : default_value;
+    }
+    const auto limit = static_cast<std::size_t>(out_size - 1);
+    if (text.size() <= limit) {
+        std::memcpy(out, text.c_str(), text.size() + 1);
+        return;
+    }
+    const std::size_t prefix = utf8_prefix_length(text, limit);
+    std::memcpy(out, text.c_str(), prefix);
+    out[prefix] = '\0';
+    s.set_error(BGT_ERROR_STORAGE,
+                "string value is too long for the output array");
+}
+
+bool bgt_load(const char filename[])
+{
+    State &s = state();
+    if (filename == nullptr || filename[0] == '\0') {
+        s.set_error(BGT_ERROR_STORAGE, "storage filename is empty");
+        return false;
+    }
+    std::ifstream file(filename, std::ios::in | std::ios::binary);
+    if (!file) {
+        std::error_code probe_error;
+        if (std::filesystem::exists(filename, probe_error)) {
+            s.set_error(BGT_ERROR_STORAGE,
+                        "failed to open storage file " +
+                            std::string(filename));
+            return false;
+        }
+        // 文件不存在是正常情况（比如游戏第一次运行）：空表、无错误。
+        s.storage.clear();
+        return true;
+    }
+    // 容忍记事本写出的 UTF-8 BOM。
+    char bom[3] = {};
+    file.read(bom, 3);
+    if (!(bom[0] == '\xEF' && bom[1] == '\xBB' && bom[2] == '\xBF')) {
+        file.clear();
+        file.seekg(0);
+    }
+    s.storage.clear();
+    std::string line;
+    std::string section;
+    bool in_section = false; // 节头之前（或坏节头之后）的键值行判为坏行
+    bool all_lines_ok = true;
+    while (std::getline(file, line)) {
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+        const std::string trimmed = trim_copy(line);
+        if (trimmed.empty() || trimmed.front() == '#') {
+            continue; // 空行与 # 整行注释
+        }
+        if (trimmed.front() == '[') {
+            std::string name;
+            bool ok = false;
+            if (trimmed.back() == ']') {
+                name = trim_copy(trimmed.substr(1, trimmed.size() - 2));
+                ok = valid_section_name(name);
+            }
+            if (!ok) {
+                s.set_error(BGT_ERROR_STORAGE,
+                            "bad line in storage file: '" + trimmed + "'");
+                all_lines_ok = false;
+                in_section = false;
+                continue;
+            }
+            section = name;
+            in_section = true;
+            s.storage[section]; // 空节也登记，往返时保留
+            continue;
+        }
+        const std::size_t eq = line.find('=');
+        if (eq == std::string::npos || !in_section) {
+            s.set_error(BGT_ERROR_STORAGE,
+                        "bad line in storage file: '" + trimmed + "'");
+            all_lines_ok = false;
+            continue;
+        }
+        const std::string key = trim_copy(line.substr(0, eq));
+        if (!valid_key_name(key)) {
+            s.set_error(BGT_ERROR_STORAGE,
+                        "bad line in storage file: '" + trimmed + "'");
+            all_lines_ok = false;
+            continue;
+        }
+        const std::string value = trim_copy(line.substr(eq + 1));
+        s.storage[section][key] = value;
+    }
+    if (file.bad()) {
+        s.set_error(BGT_ERROR_STORAGE,
+                    "failed while reading storage file " +
+                        std::string(filename));
+        return false;
+    }
+    return all_lines_ok;
+}
+
+bool bgt_save(const char filename[])
+{
+    State &s = state();
+    if (filename == nullptr || filename[0] == '\0') {
+        s.set_error(BGT_ERROR_STORAGE, "storage filename is empty");
+        return false;
+    }
+    // 先写临时文件，成功后再整体替换，避免写一半把旧存档弄坏。
+    const std::string temp_name = std::string(filename) + ".tmp";
+    {
+        std::ofstream file(temp_name,
+                           std::ios::out | std::ios::binary | std::ios::trunc);
+        if (!file) {
+            s.set_error(BGT_ERROR_STORAGE,
+                        "failed to create storage file " + temp_name);
+            return false;
+        }
+        for (const auto &section : s.storage) {
+            file << '[' << section.first << "]\n";
+            for (const auto &entry : section.second) {
+                file << entry.first << '=' << entry.second << '\n';
+            }
+            file << '\n';
+        }
+        file.flush();
+        // 显式 close 并检查：缓冲数据在 close 时才真正落盘，漏看会静默丢档。
+        file.close();
+        if (!file) {
+            s.set_error(BGT_ERROR_STORAGE,
+                        "failed while writing storage file " + temp_name);
+            // 写坏的临时文件是残渣：删掉，不留 “*.tmp” 尾巴。
+            std::error_code cleanup_error;
+            std::filesystem::remove(temp_name, cleanup_error);
+            return false;
+        }
+    }
+    std::error_code rename_error;
+    std::filesystem::remove(filename, rename_error); // 目标存在时先移除
+    rename_error.clear();
+    std::filesystem::rename(temp_name, filename, rename_error);
+    if (rename_error) {
+        s.set_error(BGT_ERROR_STORAGE,
+                    "failed to replace storage file " +
+                        std::string(filename) + ": " +
+                        rename_error.message());
+        return false;
+    }
+    return true;
+}
+
+int bgt_load_sound(const char filename[])
+{
+    State &s = state();
+    if (filename == nullptr || filename[0] == '\0') {
+        s.set_error(BGT_ERROR_AUDIO, "sound filename is empty");
+        return 0;
+    }
+    if (!ensure_audio()) {
+        return 0;
+    }
+    MIX_Audio *audio = MIX_LoadAudio(s.audio_mixer, filename, false);
+    if (audio == nullptr) {
+        s.set_error(BGT_ERROR_AUDIO,
+                    "failed to load sound " + std::string(filename));
+        return 0;
+    }
+    const int id = s.next_sound_id;
+    s.next_sound_id = s.next_sound_id + 1;
+    s.sounds[id].audio = audio;
+    s.sounds[id].volume = 100;
+    return id;
+}
+
+void bgt_play_sound(int id)
+{
+    State &s = state();
+    const auto entry_it = s.sounds.find(id);
+    if (entry_it == s.sounds.end()) {
+        s.set_error(BGT_ERROR_AUDIO, "invalid sound id");
+        return;
+    }
+    if (!ensure_audio()) {
+        return;
+    }
+    // 在轨道池里找一条没在响的；全忙时复用池里最靠前的一条（重新开始）。
+    MIX_Track *track = nullptr;
+    for (MIX_Track *candidate : s.sound_tracks) {
+        if (!MIX_TrackPlaying(candidate)) {
+            track = candidate;
+            break;
+        }
+    }
+    if (track == nullptr) {
+        track = s.sound_tracks.front();
+    }
+    if (!MIX_SetTrackAudio(track, entry_it->second.audio) ||
+        !MIX_SetTrackGain(track,
+                          static_cast<float>(entry_it->second.volume) /
+                              100.0f) ||
+        !MIX_PlayTrack(track, 0)) {
+        s.set_error(BGT_ERROR_AUDIO, "failed to play sound");
+    }
+}
+
+void bgt_set_sound_volume(int id, int volume)
+{
+    State &s = state();
+    const auto entry_it = s.sounds.find(id);
+    if (entry_it == s.sounds.end()) {
+        s.set_error(BGT_ERROR_AUDIO, "invalid sound id");
+        return;
+    }
+    entry_it->second.volume = clamp_volume(volume);
+}
+
+bool bgt_play_music(const char filename[])
+{
+    State &s = state();
+    if (filename == nullptr || filename[0] == '\0') {
+        s.set_error(BGT_ERROR_AUDIO, "music filename is empty");
+        return false;
+    }
+    if (!ensure_audio()) {
+        return false;
+    }
+    if (s.music_track == nullptr) {
+        s.music_track = MIX_CreateTrack(s.audio_mixer);
+        if (s.music_track == nullptr) {
+            s.set_error(BGT_ERROR_AUDIO, "failed to create music track");
+            return false;
+        }
+    }
+    // 流式：不把整个文件读进内存，边读边解码（内存占用与时长无关）。
+    // closeio=true：换曲或销毁轨道时由 mixer 自动关闭旧文件。
+    SDL_IOStream *io = SDL_IOFromFile(filename, "rb");
+    if (io == nullptr) {
+        s.set_error(BGT_ERROR_AUDIO,
+                    "failed to open music " + std::string(filename));
+        return false;
+    }
+    if (!MIX_SetTrackIOStream(s.music_track, io, true)) {
+        s.set_error(BGT_ERROR_AUDIO,
+                    "failed to start music " + std::string(filename));
+        return false;
+    }
+    MIX_SetTrackGain(s.music_track,
+                     static_cast<float>(s.music_volume) / 100.0f);
+    // 无限循环（-1 的语义已在 Step 4 对照头文件注释确认）。
+    SDL_PropertiesID props = SDL_CreateProperties();
+    SDL_SetNumberProperty(props, MIX_PROP_PLAY_LOOPS_NUMBER, -1);
+    const bool ok = MIX_PlayTrack(s.music_track, props);
+    SDL_DestroyProperties(props);
+    if (!ok) {
+        s.set_error(BGT_ERROR_AUDIO,
+                    "failed to play music " + std::string(filename));
+        return false;
+    }
+    return true;
+}
+
+bool bgt_file_exists(const char filename[])
+{
+    if (filename == nullptr || filename[0] == '\0') {
+        return false;
+    }
+    std::error_code error;
+    return std::filesystem::exists(filename, error);
+}
+
+void bgt_stop_music()
+{
+    State &s = state();
+    if (s.music_track == nullptr) {
+        return; // 从没播过音乐：什么都不做
+    }
+    MIX_StopTrack(s.music_track, 0);
+}
+
+void bgt_set_music_volume(int volume)
+{
+    State &s = state();
+    s.music_volume = clamp_volume(volume);
+    if (s.music_track != nullptr) {
+        MIX_SetTrackGain(s.music_track,
+                         static_cast<float>(s.music_volume) / 100.0f);
+    }
+}
+
+namespace {
+
+// 把 text 的前 out_size - 1 个字节按 UTF-8 字符边界截断后复制进 out，
+// 保证不会切在多字节字符中间，并补上结束符。查询辅助，绝不记错误。
+// 命名避开平行分支的同名助手（合体时统一）。
+void utf8_prefix_copy(const std::string &text, char out[], int out_size)
+{
+    if (out == nullptr || out_size <= 0) {
+        return;
+    }
+    int limit = out_size - 1;
+    if (static_cast<int>(text.size()) < limit) {
+        limit = static_cast<int>(text.size());
+    }
+    // UTF-8 续字节形如 10xxxxxx：截断点落在字符中间就向前退到边界。
+    while (limit > 0 &&
+           (static_cast<unsigned char>(text[limit]) & 0xC0U) == 0x80U) {
+        limit = limit - 1;
+    }
+    for (int i = 0; i < limit; i = i + 1) {
+        out[i] = text[i];
+    }
+    out[limit] = '\0';
+}
+
+// 把一条错误消息按最大宽度逐行绘制：先用 TTF_MeasureString 量出本行
+// 能放下的字节数，再回退到本行范围内的最后一个空格（优先在空格断行），
+// 行内没有空格才在量出的边界硬断。UTF-8 多字节字符不会被切开。
+// 消息按值传入：循环内的绘制失败会记新错误，环形队列的 push/pop 可能
+// 使按引用传入的历史条目失效（index 0 且历史满时的悬空引用）。
+void draw_wrapped_error(State &s, int x, int y, int size,
+                        std::string message)
+{
+    const int max_width = s.width - x - 16;
+    if (max_width <= 0) {
+        draw_text_impl(s, x, y, message.c_str(), size);
+        return;
+    }
+    TTF_Font *font = get_font(s, size);
+    if (font == nullptr) {
+        // 字体不可用：get_font 已经记录过错误，这里直接放弃绘制，
+        // 避免再走一遍绘制路径把同一条错误记第二次。
+        return;
+    }
+    const int line_height = size + size / 3;
+    std::size_t start = 0;
+    int line_y = y;
+    while (start < message.size()) {
+        const std::string rest = message.substr(start);
+        int measured_width = 0;
+        std::size_t measured_length = 0;
+        if (!TTF_MeasureString(font, rest.c_str(), rest.size(), max_width,
+                               &measured_width, &measured_length) ||
+            measured_length == 0) {
+            // 测量失败或一个字符都放不下：剩余部分当一行画，避免死循环。
+            draw_text_impl(s, x, line_y, rest.c_str(), size);
+            return;
+        }
+        std::size_t break_at = start + measured_length;
+        if (break_at < message.size()) {
+            // 本行放不下整条消息：优先在行内最后一个空格处断行。
+            const std::size_t space =
+                message.find_last_of(' ', break_at - 1);
+            if (space != std::string::npos && space > start) {
+                break_at = space;
+            }
+        }
+        const std::string line = message.substr(start, break_at - start);
+        draw_text_impl(s, x, line_y, line.c_str(), size);
+        line_y = line_y + line_height;
+        start = break_at;
+        while (start < message.size() && message[start] == ' ') {
+            start = start + 1; // 断行点后的空格不进下一行
+        }
+    }
+}
+
+} // namespace
+
 bool bgt_has_error()
 {
-    return state().error_code != BGT_ERROR_NONE;
+    return !state().errors.empty();
+}
+
+int bgt_error_count()
+{
+    return static_cast<int>(state().errors.size());
+}
+
+int bgt_error_code(int index)
+{
+    const State &s = state();
+    if (index < 0 || index >= static_cast<int>(s.errors.size())) {
+        return BGT_ERROR_NONE;
+    }
+    return s.errors[static_cast<std::size_t>(index)].code;
 }
 
 int bgt_error_code()
 {
-    return state().error_code;
+    return bgt_error_code(bgt_error_count() - 1);
+}
+
+void bgt_error_text(int index, char out[], int out_size)
+{
+    if (out == nullptr || out_size <= 0) {
+        return;
+    }
+    const State &s = state();
+    if (index < 0 || index >= static_cast<int>(s.errors.size())) {
+        out[0] = '\0';
+        return;
+    }
+    utf8_prefix_copy(
+        s.errors[static_cast<std::size_t>(index)].message, out, out_size);
+}
+
+void bgt_print_error(int index)
+{
+    const State &s = state();
+    if (index < 0 || index >= static_cast<int>(s.errors.size())) {
+        return;
+    }
+    std::fprintf(stderr, "libbgt error %d: %s\n",
+                 s.errors[static_cast<std::size_t>(index)].code,
+                 s.errors[static_cast<std::size_t>(index)].message.c_str());
 }
 
 void bgt_print_error()
 {
-    const State &s = state();
-    if (s.error_code == BGT_ERROR_NONE) {
+    bgt_print_error(bgt_error_count() - 1);
+}
+
+void bgt_draw_error(int x, int y, int size, int index)
+{
+    State &s = state();
+    if (index < 0 || index >= static_cast<int>(s.errors.size())) {
         return;
     }
-    std::fprintf(stderr, "libbgt error %d: %s\n", s.error_code,
-                 s.error_message.c_str());
+    draw_wrapped_error(s, x, y, size,
+                       s.errors[static_cast<std::size_t>(index)].message);
 }
 
 void bgt_draw_error(int x, int y, int size)
 {
-    State &s = state();
-    if (s.error_code == BGT_ERROR_NONE || s.error_message.empty()) {
-        return;
-    }
-    draw_text_impl(s, x, y, s.error_message.c_str(), size);
+    bgt_draw_error(x, y, size, bgt_error_count() - 1);
 }
 
 void bgt_clear_error()

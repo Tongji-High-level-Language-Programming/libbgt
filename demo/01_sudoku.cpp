@@ -187,8 +187,8 @@ bool read_puzzle_from_file(SudokuState &s, const char *filename)
 void load_puzzle(SudokuState &s)
 {
     s.loaded_from_file =
-        read_puzzle_from_file(s, "06_sudoku_puzzle.txt") ||
-        read_puzzle_from_file(s, "examples/06_sudoku_puzzle.txt");
+        read_puzzle_from_file(s, "01_sudoku_puzzle.txt") ||
+        read_puzzle_from_file(s, "demo/01_sudoku_puzzle.txt");
     if (s.loaded_from_file) {
         return;
     }
@@ -418,7 +418,7 @@ void draw_panel(const SudokuState &s)
 
     bgt_set_color(BGT_DARK_GRAY);
     bgt_draw_text(kPanelInnerX, kPuzzleLabelY,
-                  s.loaded_from_file ? "谜题：06_sudoku_puzzle.txt"
+                  s.loaded_from_file ? "谜题：01_sudoku_puzzle.txt"
                                      : "谜题：内置备用题目",
                   kPuzzleFontSize);
 }

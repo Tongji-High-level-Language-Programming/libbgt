@@ -6,7 +6,7 @@
 // readability-function-cognitive-complexity, bugprone-easily-swappable-parameters)
 
 // 汉诺塔演示：开始/游戏中/完成三态流程；游戏中支持手动游玩与递归自动演示。
-// 参考 docs/exercises.md 的作业序列；本文件是其完成品的参考实现。
+// 参考 docs/exercises.md 的作业题库（汉诺塔一节）；本文件是其参考实现。
 
 namespace {
 

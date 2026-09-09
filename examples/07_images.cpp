@@ -41,16 +41,16 @@ int main()
     bgt_set_fps_limit(target_fps);
 
     // ---------- 加载图片（在主循环外，只做一次）----------
-    // 测试图 09_image.png 是 128x128 的四象限图：
+    // 测试图 07_image.png 是 128x128 的四象限图：
     //   左上=不透明红   右上=半透明蓝   左下=完全透明   右下=绿色圆
     // 不对称的象限让我们能一眼看出翻转和旋转的方向。
     //
     // 加载三份：img_a 始终保持恒等变换（作参考），
     // img_b / img_c 在各板块中被重新设置变换状态。
     // 同一文件多次加载得到独立编号——这正是"独立变换"需要的行为。
-    const int img_a = bgt_load_image("09_image.png");
-    const int img_b = bgt_load_image("09_image.png");
-    const int img_c = bgt_load_image("09_image.png");
+    const int img_a = bgt_load_image("07_image.png");
+    const int img_b = bgt_load_image("07_image.png");
+    const int img_c = bgt_load_image("07_image.png");
 
     // ---------- 各板块需要的"跨帧状态"（就是普通变量）----------
 
@@ -83,7 +83,7 @@ int main()
             bgt_draw_error(40, 80, 20);
             bgt_set_color(BGT_DARK_GRAY);
             bgt_draw_text(40, 120,
-                          "请从 build 目录运行本程序（09_image.png 在 exe 旁"
+                          "请从 build 目录运行本程序（07_image.png 在 exe 旁"
                           "边）。",
                           18);
             bgt_update_window();
