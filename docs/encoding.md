@@ -114,7 +114,6 @@ package/
   include/bgt.h          # GBK 编码（与学生的源码编码一致）
   lib/bgt_vendored.lib   # 合并了 SDL3 系列的单个静态库
   libbgt-gbk.props       # Visual Studio 属性表
-  libbgt-encoding.md     # 本文档
 ```
 
 接入步骤：

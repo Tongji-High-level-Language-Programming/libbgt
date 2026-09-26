@@ -11,6 +11,9 @@
 
   注意：本属性表不能与 /utf-8 同时使用（MSVC 会报 D8016）。若工程里另有
   /utf-8，请一并去掉。
+
+  完整说明（两种编码模式的对照、SDL 边界转换点、已知限制等）见仓库里的
+  docs/encoding.md。
 -->
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemDefinitionGroup>

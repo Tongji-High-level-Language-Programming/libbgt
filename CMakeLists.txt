@@ -123,6 +123,21 @@ set_target_properties(bgt PROPERTIES
 if(BGT_BUILD_VENDORED)
     set(BGT_VENDORED_LIBRARY
         "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/bgt_vendored.lib")
+
+    # SDL3_image 只是把 libpng / zlib 作为 PRIVATE 静态库链接，lib.exe 不会自动把
+    # 它们收进合并结果；不显式列出的话，学生工程一调用 bgt_load_image 就会缺
+    # png_* 符号。这里按“目标存在才合并”的方式处理，方便裁剪 PNG 支持的构建。
+    set(BGT_VENDORED_EXTRA_TARGETS "")
+    foreach(candidate png_static zlibstatic)
+        if(TARGET ${candidate})
+            list(APPEND BGT_VENDORED_EXTRA_TARGETS ${candidate})
+        endif()
+    endforeach()
+    set(BGT_VENDORED_EXTRA_FILES "")
+    foreach(extra ${BGT_VENDORED_EXTRA_TARGETS})
+        list(APPEND BGT_VENDORED_EXTRA_FILES "$<TARGET_FILE:${extra}>")
+    endforeach()
+
     add_custom_command(
         OUTPUT "${BGT_VENDORED_LIBRARY}"
         COMMAND "${CMAKE_AR}" /NOLOGO "/OUT:${BGT_VENDORED_LIBRARY}"
@@ -130,9 +145,10 @@ if(BGT_BUILD_VENDORED)
                 "$<TARGET_FILE:SDL3-static>"
                 "$<TARGET_FILE:SDL3_ttf-static>"
                 "$<TARGET_FILE:SDL3_image-static>"
+                ${BGT_VENDORED_EXTRA_FILES}
                 "$<TARGET_FILE:SDL3_mixer-static>"
         DEPENDS bgt SDL3-static SDL3_ttf-static SDL3_image-static
-            SDL3_mixer-static
+            ${BGT_VENDORED_EXTRA_TARGETS} SDL3_mixer-static
         COMMENT "Merging libbgt and vendored dependencies"
         VERBATIM)
     add_custom_target(bgt_vendored ALL DEPENDS "${BGT_VENDORED_LIBRARY}")
@@ -345,13 +361,12 @@ else()
 endif()
 if(BGT_ENCODING_IS_GBK)
     # 学生工程按 GBK 读取源码，因此分发的头文件也必须是 GBK（库自身仍用仓库里的
-    # UTF-8 头文件编译）。属性表让 Visual Studio 工程一步接入。
+    # UTF-8 头文件编译）。属性表让 Visual Studio 工程一步接入；其余说明见仓库里的
+    # docs/encoding.md，不进分发物。
     install(FILES "${BGT_GBK_HEADER}"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cmake/libbgt-gbk.props"
         DESTINATION "." RENAME "libbgt-gbk.props")
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/docs/encoding.md"
-        DESTINATION "." RENAME "libbgt-encoding.md")
 else()
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/include/bgt.h"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
