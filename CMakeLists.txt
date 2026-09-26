@@ -139,11 +139,44 @@ if(BGT_BUILD_VENDORED)
 endif()
 
 if(MSVC)
-    # 库自身的源码与中文注释都是 UTF-8，与 BGT_SOURCE_ENCODING（用户代码的运行期
-    # 编码）无关，因此始终按 UTF-8 编译。
     target_compile_options(bgt PRIVATE /W4 /utf-8)
 else()
     target_compile_options(bgt PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+# ---------------------------------------------------------------------------
+# GBK 分发：为学生工程生成 GBK 版头文件与 Visual Studio 属性表。
+#
+# 仓库内的源码一律是 UTF-8，但 GBK 模式的学生工程需要一份 GBK 版头文件：MSVC 的
+# /source-charset 是“按编译单元”生效的，无法只对某一个 #include 指定编码；而把
+# UTF-8 头文件按 GBK 解析会直接产生语法错误（不是仅仅注释乱码）。详见 docs/encoding.md。
+# ---------------------------------------------------------------------------
+if(BGT_ENCODING_IS_GBK)
+    add_executable(bgt_transcode tools/bgt_transcode.cpp src/bgt_encoding.cpp)
+    target_include_directories(bgt_transcode PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    set_target_properties(bgt_transcode PROPERTIES
+        CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
+    if(MSVC)
+        # 工具自身按 UTF-8 编译，并以默认（UTF-8）模式构建，与库的模式无关。
+        target_compile_options(bgt_transcode PRIVATE /utf-8)
+    endif()
+
+    set(BGT_GBK_HEADER_DIR "${CMAKE_CURRENT_BINARY_DIR}/gbk-include")
+    set(BGT_GBK_HEADER "${BGT_GBK_HEADER_DIR}/bgt.h")
+    add_custom_command(
+        OUTPUT "${BGT_GBK_HEADER}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${BGT_GBK_HEADER_DIR}"
+        COMMAND bgt_transcode
+                "${CMAKE_CURRENT_SOURCE_DIR}/include/bgt.h"
+                "${BGT_GBK_HEADER}"
+                gbk
+                --prepend "#define BGT_SOURCE_ENCODING BGT_ENCODING_GBK"
+        DEPENDS bgt_transcode "${CMAKE_CURRENT_SOURCE_DIR}/include/bgt.h"
+        COMMENT "Generating the GBK-encoded bgt.h for distribution"
+        VERBATIM)
+    add_custom_target(bgt_gbk_header ALL DEPENDS "${BGT_GBK_HEADER}")
 endif()
 
 if(BGT_BUILD_EXAMPLES)
@@ -310,10 +343,26 @@ else()
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 endif()
-install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/include/bgt.h"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+if(BGT_ENCODING_IS_GBK)
+    # 学生工程按 GBK 读取源码，因此分发的头文件也必须是 GBK（库自身仍用仓库里的
+    # UTF-8 头文件编译）。属性表让 Visual Studio 工程一步接入。
+    install(FILES "${BGT_GBK_HEADER}"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cmake/libbgt-gbk.props"
+        DESTINATION "." RENAME "libbgt-gbk.props")
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/docs/encoding.md"
+        DESTINATION "." RENAME "libbgt-encoding.md")
+else()
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/include/bgt.h"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+endif()
 
 set(CPACK_GENERATOR ZIP)
+# 两种编码模式的二进制包不能混淆，文件名带后缀区分。
+set(BGT_PACKAGE_ENCODING_SUFFIX "")
+if(BGT_ENCODING_IS_GBK)
+    set(BGT_PACKAGE_ENCODING_SUFFIX "-gbk")
+endif()
 set(CPACK_PACKAGE_FILE_NAME
-    "libbgt-${PROJECT_VERSION}-msvc-x64")
+    "libbgt-${PROJECT_VERSION}-msvc-x64${BGT_PACKAGE_ENCODING_SUFFIX}")
 include(CPack)

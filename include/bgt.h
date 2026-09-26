@@ -24,6 +24,32 @@
 #define BGT_SOURCE_ENCODING BGT_ENCODING_UTF8
 #endif
 
+// 编译期防呆：GBK 构建下，本编译单元的执行字符集必须是 GBK，否则库收到的窄字符串
+// 与它期望的编码不一致，运行期只会表现为中文乱码。BGT_BUILDING_LIBRARY 表示正在
+// 编译 libbgt 自身：库始终按 UTF-8 编译，不受这项检查约束。
+//
+// 这里刻意用通用字符名 \u4E2D（中）而不是直接写字面量：通用字符名在源码里是纯
+// ASCII，因此无论本编译单元按哪种源字符集解析它，比较的都是“执行字符集把 U+4E2D
+// 编成几个字节”——GBK 是 2，UTF-8 是 3。
+#if BGT_SOURCE_ENCODING == BGT_ENCODING_GBK && !defined(BGT_BUILDING_LIBRARY) && \
+    !defined(BGT_DISABLE_ENCODING_CHECK)
+static_assert(sizeof("\u4E2D") - 1 == 2,
+              "libbgt(GBK 构建)：本编译单元的执行字符集必须是 GBK。MSVC 请加 "
+              "/source-charset:.936 /execution-charset:.936（或使用随包提供的 "
+              "libbgt-gbk.props）；GCC/Clang 请加 -finput-charset=GBK "
+              "-fexec-charset=GBK。");
+#endif
+
+// 链接期防呆（MSVC）：头文件与 libbgt 库的构建模式必须一致。用错编码版本的头文件
+// 或库时链接器会直接报 LNK2038，而不是等到运行期才显示乱码。
+#if defined(_MSC_VER) && !defined(BGT_DISABLE_ENCODING_CHECK)
+#if BGT_SOURCE_ENCODING == BGT_ENCODING_GBK
+#pragma detect_mismatch("BGT_SOURCE_ENCODING", "GBK")
+#else
+#pragma detect_mismatch("BGT_SOURCE_ENCODING", "UTF-8")
+#endif
+#endif
+
 #ifdef _MSC_VER
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "winmm.lib")
