@@ -5,12 +5,15 @@
 
 #include "bgt.h"
 
+#include <algorithm>
 #include <climits>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <utility>
+#include <vector>
 
 // NOLINTBEGIN(readability-magic-numbers)
 
@@ -31,6 +34,41 @@ int g_failed_checks = 0;
 bool text_equals(const char *a, const char *b)
 {
     return std::strcmp(a, b) == 0;
+}
+
+// 一节及其键值对（键、值都是落盘后的文本形式）。
+using DumpSection = std::pair<std::string, std::vector<std::pair<std::string, std::string>>>;
+
+// libbgt 用 std::map 保存节与键，落盘顺序是 std::string 的字节序。中文在
+// UTF-8 与 GBK 下的字节序不同，所以期望文本必须由同一批字面量现场排序得到，
+// 不能写成固定的字节序列。
+void check_sorted_dump(const char *label, const std::string &content,
+                       std::vector<DumpSection> sections)
+{
+    std::sort(sections.begin(), sections.end(),
+              [](const DumpSection &left, const DumpSection &right) {
+                  return left.first < right.first;
+              });
+    std::string expected;
+    for (DumpSection &section : sections) {
+        std::sort(section.second.begin(), section.second.end(),
+                  [](const auto &left, const auto &right) {
+                      return left.first < right.first;
+                  });
+        expected += "[" + section.first + "]\n";
+        for (const auto &entry : section.second) {
+            expected += entry.first + "=" + entry.second + "\n";
+        }
+        expected += "\n";
+    }
+    if (content == expected) {
+        return;
+    }
+    std::fprintf(stderr,
+                 "FAILED: %s (storage dump mismatch)\n--- expected ---\n%s"
+                 "--- actual ---\n%s----------------\n",
+                 label, expected.c_str(), content.c_str());
+    g_failed_checks = g_failed_checks + 1;
 }
 
 } // namespace
@@ -124,14 +162,15 @@ int main()
     BGT_CHECK(bgt_has_error());
     bgt_clear_error();
 
-    // 7) 截断：放不下时按 UTF-8 边界截断并记错；放得下则完整拷贝。
+    // 7) 截断：放不下时按字符边界截断（不会把汉字切一半）并记错；放得下则完整拷贝。
+    //    out_size 取得足够小，保证 UTF-8 与 GBK 下都只放得下 1 个汉字。
     bgt_set_string("截断", "long", "张三");
-    char small[5] = {}; // 放得下 1 个中文字符 + NUL
-    bgt_get_string("截断", "long", small, 5, "?");
+    char small[4] = {}; // 只放得下 1 个汉字 + NUL（GBK 2 字节 / UTF-8 3 字节）
+    bgt_get_string("截断", "long", small, 4, "?");
     BGT_CHECK(text_equals(small, "张"));
     BGT_CHECK(bgt_has_error());
     bgt_clear_error();
-    char fits[8] = {}; // “张三”共 6 字节，加 NUL 放得进 8
+    char fits[8] = {}; // 两种编码下“张三”加 NUL 都放得进（GBK 5 字节 / UTF-8 7 字节）
     bgt_get_string("截断", "long", fits, 8, "?");
     BGT_CHECK(text_equals(fits, "张三"));
     BGT_CHECK(!bgt_has_error());
@@ -188,17 +227,17 @@ int main()
     bgt_get_string("玩家", "等式", formula, 16, "?");
     BGT_CHECK(text_equals(formula, "1+1=2"));
 
-    // 10) 写盘格式：节与节内键都按字典序（按 UTF-8 字节序），行尾 \n。
+    // 10) 写盘格式：节与节内键都按字节序排列，行尾 \n，每节后留一个空行。
     {
         std::ifstream file(k_test_file, std::ios::binary);
         std::string content((std::istreambuf_iterator<char>(file)),
                             std::istreambuf_iterator<char>());
-        // 字节序：最高分(E6 9C..) < 极限(E6 9E..) < 玩家(E7..) < 进度(E8..)
-        BGT_CHECK(content ==
-                  "[最高分]\nbest=321\n\n"
-                  "[极限]\nmax=2147483647\nmin=-2147483648\n\n"
-                  "[玩家]\nname=李四\n等式=1+1=2\n\n"
-                  "[进度]\ntime=45.5\n\n");
+        check_sorted_dump("10) 写盘格式", content,
+                          {{"最高分", {{"best", "321"}}},
+                           {"进度", {{"time", "45.5"}}},
+                           {"玩家", {{"name", "李四"}, {"等式", "1+1=2"}}},
+                           {"极限",
+                            {{"max", "2147483647"}, {"min", "-2147483648"}}}});
     }
 
     // 11) load 的整表替换：读入后，之前只在内存里的键消失。
@@ -208,9 +247,28 @@ int main()
     BGT_CHECK(bgt_get_int("临时", "x", 0) == 0);
 
     // 12) 手写文件：# 注释、\r\n 行尾、UTF-8 BOM、键值两侧空格都能读。
+    //     带 BOM 的那份只写 ASCII：带 BOM 的文件按 UTF-8 解释，写中文会随源码
+    //     编码变化（中文 + BOM 的互操作用例见 tests/test_encoding.cpp）。
     {
         std::ofstream file(k_test_file, std::ios::binary | std::ios::trunc);
         file << "\xEF\xBB\xBF";
+        file << "# comment written with a utf-8 bom\r\n";
+        file << "\r\n";
+        file << "[bom]\r\n";
+        file << " volume = 80 \r\n"; // 键值两侧的空格会被去掉
+        file << "muted=true\r\n";
+    }
+    bgt_clear_error();
+    BGT_CHECK(bgt_load(k_test_file));
+    BGT_CHECK(!bgt_has_error());
+    BGT_CHECK(bgt_get_int("bom", "volume", 0) == 80);
+    char bom_muted[8] = {};
+    bgt_get_string("bom", "muted", bom_muted, 8, "?");
+    BGT_CHECK(text_equals(bom_muted, "true"));
+
+    // 12b) 不带 BOM 的手写文件用源码编码书写，中文节名、注释、\r\n 行尾都照常读入。
+    {
+        std::ofstream file(k_test_file, std::ios::binary | std::ios::trunc);
         file << "# 用记事本写的存档\r\n";
         file << "\r\n";
         file << "[设置]\r\n";
@@ -265,8 +323,10 @@ int main()
         std::ifstream file(k_test_file, std::ios::binary);
         std::string content((std::istreambuf_iterator<char>(file)),
                             std::istreambuf_iterator<char>());
-        // 字节序：空节(E7..) < 节一/节二(E8..)，一(B8..) < 二(BA..)
-        BGT_CHECK(content == "[空节]\n\n[节一]\na=9\n\n[节二]\nb=2\n\n");
+        check_sorted_dump("14) 重复节头与空节往返", content,
+                          {{"节一", {{"a", "9"}}},
+                           {"节二", {{"b", "2"}}},
+                           {"空节", {}}});
     }
 
     // 15) 超范围整数文本：按 int 读 → 默认值 + 记错；按 double 读得动。
