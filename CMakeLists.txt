@@ -6,12 +6,12 @@ include(GNUInstallDirs)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Treat all project and vendored dependency sources as UTF-8 when using the
-# MSVC command-line interface. This also prevents C4819 warnings from sources
-# containing characters that are not representable in the active code page.
-if(MSVC)
-    add_compile_options(/utf-8)
-endif()
+# 字符集选项按目标下发，不能用顶层 add_compile_options：MSVC 的 /utf-8 与
+# /execution-charset:<代码页> 互斥（D8016），而 BGT_SOURCE_ENCODING=GBK 时
+# 消费端必须指定执行字符集。bgt_apply_text_encoding() 见下方定义。
+#
+# 本仓库自身的源码一律是 UTF-8；BGT_SOURCE_ENCODING 描述的是“窄字符串在
+# 运行期是什么编码”，也就是学生源码所在的编码。详见 docs/encoding.md。
 
 option(BGT_BUILD_EXAMPLES "Build libbgt examples" ON)
 option(BGT_BUILD_TESTS "Build libbgt tests" OFF)
@@ -42,61 +42,18 @@ if(BGT_USE_SYSTEM_SDL)
             "BGT_USE_SYSTEM_SDL requires SDL3, SDL3_ttf, SDL3_image and SDL3_mixer packages with static targets")
     endif()
 else()
-    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/SDL/CMakeLists.txt")
-        message(FATAL_ERROR "third_party/SDL is missing. Run: git submodule update --init --recursive")
-    endif()
-    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/SDL_ttf/CMakeLists.txt")
-        message(FATAL_ERROR "third_party/SDL_ttf is missing. Run: git submodule update --init --recursive")
-    endif()
-    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/SDL_image/CMakeLists.txt")
-        message(FATAL_ERROR "third_party/SDL_image is missing. Run: git submodule update --init --recursive")
-    endif()
-    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/SDL_mixer/CMakeLists.txt")
-        message(FATAL_ERROR "third_party/SDL_mixer is missing. Run: git submodule update --init --recursive")
-    endif()
-
-    # Build the bundled dependencies only as static libraries. Besides making the
-    # examples self-contained, the explicit settings prevent SDL3::SDL3 from
-    # selecting SDL's shared target when both variants are available.
-    set(SDL_SHARED OFF CACHE BOOL "" FORCE)
-    set(SDL_STATIC ON CACHE BOOL "" FORCE)
-    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-    set(SDLTTF_SAMPLES OFF CACHE BOOL "" FORCE)
-    set(SDLTTF_TESTS OFF CACHE BOOL "" FORCE)
-    set(SDLTTF_VENDORED ON CACHE BOOL "" FORCE)
-    set(SDLIMAGE_VENDORED ON CACHE BOOL "" FORCE)
-    set(SDLIMAGE_TESTS OFF CACHE BOOL "" FORCE)
-    set(SDLIMAGE_SAMPLES OFF CACHE BOOL "" FORCE)
-    set(SDLIMAGE_TIF OFF CACHE BOOL "" FORCE)
-    set(SDLIMAGE_WEBP OFF CACHE BOOL "" FORCE)
-    set(SDLIMAGE_AVIF OFF CACHE BOOL "" FORCE)
-    set(SDLIMAGE_JXL OFF CACHE BOOL "" FORCE)
-    set(SDLIMAGE_DEPS_SHARED OFF CACHE BOOL "" FORCE)
-    set(SDLIMAGE_PNG_SHARED OFF CACHE BOOL "" FORCE)
-
-    # SDL_mixer：只保留内置单文件解码器（WAV / dr_mp3 / drflac /
-    # stb_vorbis），关闭所有带嵌套子模块的解码器——零递归依赖。
-    set(SDLMIXER_VENDORED ON CACHE BOOL "" FORCE)
-    set(SDLMIXER_TESTS OFF CACHE BOOL "" FORCE)
-    set(SDLMIXER_EXAMPLES OFF CACHE BOOL "" FORCE)
-    set(SDLMIXER_DEPS_SHARED OFF CACHE BOOL "" FORCE)
-    set(SDLMIXER_MIDI OFF CACHE BOOL "" FORCE)
-    set(SDLMIXER_MOD OFF CACHE BOOL "" FORCE)
-    set(SDLMIXER_GME OFF CACHE BOOL "" FORCE)
-    set(SDLMIXER_OPUS OFF CACHE BOOL "" FORCE)
-    set(SDLMIXER_WAVPACK OFF CACHE BOOL "" FORCE)
-    set(SDLMIXER_FLAC_LIBFLAC OFF CACHE BOOL "" FORCE)
-    set(SDLMIXER_VORBIS_VORBISFILE OFF CACHE BOOL "" FORCE)
-    set(SDLMIXER_VORBIS_TREMOR OFF CACHE BOOL "" FORCE)
-    set(SDLMIXER_MP3_MPG123 OFF CACHE BOOL "" FORCE)
-
-    set(CMAKE_DISABLE_PRECOMPILE_HEADERS ON)
-
-    add_subdirectory(third_party/SDL SYSTEM EXCLUDE_FROM_ALL)
-    add_subdirectory(third_party/SDL_ttf SYSTEM EXCLUDE_FROM_ALL)
-    add_subdirectory(third_party/SDL_image SYSTEM EXCLUDE_FROM_ALL)
-    add_subdirectory(third_party/SDL_mixer SYSTEM EXCLUDE_FROM_ALL)
+    # 依赖的获取与配置都在 third_party 目录作用域里，这样 MSVC 的 /utf-8 只作用
+    # 于 vendored 源码，不会传染给需要指定执行字符集的项目目标。
+    add_subdirectory(third_party)
 endif()
+
+# 给消费 libbgt 的目标（示例、演示、测试、学生工程）下发字符集选项。
+# 仓库内的源码都是 UTF-8 文件，所以默认的 UTF-8 模式就是 MSVC 的 /utf-8。
+function(bgt_apply_text_encoding target)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /utf-8)
+    endif()
+endfunction()
 
 add_library(bgt ${BGT_LIBRARY_TYPE} src/bgt.cpp)
 add_library(libbgt::bgt ALIAS bgt)
@@ -140,7 +97,9 @@ if(BGT_BUILD_VENDORED)
 endif()
 
 if(MSVC)
-    target_compile_options(bgt PRIVATE /W4)
+    # 库自身的源码与中文注释都是 UTF-8，与 BGT_SOURCE_ENCODING（用户代码的运行期
+    # 编码）无关，因此始终按 UTF-8 编译。
+    target_compile_options(bgt PRIVATE /W4 /utf-8)
 else()
     target_compile_options(bgt PRIVATE -Wall -Wextra -Wpedantic)
 endif()
@@ -150,6 +109,7 @@ if(BGT_BUILD_EXAMPLES)
         add_executable(${target} ${source})
         target_link_libraries(${target} PRIVATE libbgt::bgt)
         set_target_properties(${target} PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
+        bgt_apply_text_encoding(${target})
 
     endfunction()
 
@@ -245,24 +205,28 @@ if(BGT_BUILD_TESTS)
     target_link_libraries(bgt_test_random PRIVATE libbgt::bgt)
     set_target_properties(bgt_test_random PROPERTIES CXX_STANDARD 20
         CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
+    bgt_apply_text_encoding(bgt_test_random)
     add_test(NAME bgt_test_random COMMAND bgt_test_random)
 
     add_executable(bgt_test_collision tests/test_collision.cpp)
     target_link_libraries(bgt_test_collision PRIVATE libbgt::bgt)
     set_target_properties(bgt_test_collision PROPERTIES CXX_STANDARD 20
         CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
+    bgt_apply_text_encoding(bgt_test_collision)
     add_test(NAME bgt_test_collision COMMAND bgt_test_collision)
 
     add_executable(bgt_test_storage tests/test_storage.cpp)
     target_link_libraries(bgt_test_storage PRIVATE libbgt::bgt)
     set_target_properties(bgt_test_storage PROPERTIES CXX_STANDARD 20
         CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
+    bgt_apply_text_encoding(bgt_test_storage)
     add_test(NAME bgt_test_storage COMMAND bgt_test_storage)
 
     add_executable(bgt_test_sound tests/test_sound.cpp)
     target_link_libraries(bgt_test_sound PRIVATE libbgt::bgt)
     set_target_properties(bgt_test_sound PROPERTIES CXX_STANDARD 20
         CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
+    bgt_apply_text_encoding(bgt_test_sound)
     add_test(NAME bgt_test_sound COMMAND bgt_test_sound
         WORKING_DIRECTORY $<TARGET_FILE_DIR:bgt_test_sound>)
 
@@ -280,6 +244,7 @@ if(BGT_BUILD_TESTS)
     target_link_libraries(bgt_test_errors PRIVATE libbgt::bgt)
     set_target_properties(bgt_test_errors PROPERTIES CXX_STANDARD 20
         CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
+    bgt_apply_text_encoding(bgt_test_errors)
     add_test(NAME bgt_test_errors COMMAND bgt_test_errors)
 endif()
 
