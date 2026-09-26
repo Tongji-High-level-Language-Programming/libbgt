@@ -286,8 +286,8 @@ unsigned bgt_rgba(int r, int g, int b, int a);
   做 GBK 与 UTF-8 的双向转换。
 - 字符集选项必须按目标下发：MSVC 的 `/utf-8` 与 `/execution-charset:<代码页>` 互斥
   （D8016），因此不能再用顶层 `add_compile_options`。
-- GBK 模式的学生包附带 GBK 版头文件与 Visual Studio 属性表，并带编译期与链接期的
-  编码一致性检查。详见[编码支持](encoding.md)。
+- GBK 模式的学生包附带 GBK 版头文件（自带构建模式声明，学生工程无需配置字符集
+  选项），并带编译期与链接期的编码一致性检查。详见[编码支持](encoding.md)。
 
 ## 9. SDL3 封装原则
 

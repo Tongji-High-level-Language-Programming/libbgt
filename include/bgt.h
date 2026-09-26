@@ -34,10 +34,10 @@
 #if BGT_SOURCE_ENCODING == BGT_ENCODING_GBK && !defined(BGT_BUILDING_LIBRARY) && \
     !defined(BGT_DISABLE_ENCODING_CHECK)
 static_assert(sizeof("\u4E2D") - 1 == 2,
-              "libbgt(GBK 构建)：本编译单元的执行字符集必须是 GBK。MSVC 请加 "
-              "/source-charset:.936 /execution-charset:.936（或使用随包提供的 "
-              "libbgt-gbk.props）；GCC/Clang 请加 -finput-charset=GBK "
-              "-fexec-charset=GBK。");
+              "libbgt(GBK 构建)：本编译单元的执行字符集必须是 GBK。MSVC 请去掉 "
+              "/utf-8（中文 Windows 的默认字符集就是 936），或显式加 "
+              "/source-charset:.936 /execution-charset:.936；GCC/Clang 请加 "
+              "-finput-charset=GBK -fexec-charset=GBK。");
 #endif
 
 // 链接期防呆（MSVC）：头文件与 libbgt 库的构建模式必须一致。用错编码版本的头文件

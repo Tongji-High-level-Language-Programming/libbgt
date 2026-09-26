@@ -107,34 +107,37 @@ GCC / Clang 对应 `-finput-charset=UTF-8 -fexec-charset=GBK`。
 
 ## 6. 学生工程接入（Visual Studio + 单库分发）
 
-GBK 模式下 `cmake --install` 或 `cpack` 产出的包：
+GBK 模式下 `cmake --install` 或 `cpack` 产出的包只有两样东西：
 
 ```text
 package/
   include/bgt.h          # GBK 编码（与学生的源码编码一致）
   lib/bgt_vendored.lib   # 合并了 SDL3 系列的单个静态库
-  libbgt-gbk.props       # Visual Studio 属性表
 ```
 
-接入步骤：
+接入步骤只有一步：工程属性里添加 `include` 目录、`lib` 目录，并链接
+`bgt_vendored.lib`。
 
-1. 工程属性里添加 `include` 目录、`lib` 目录，并链接 `bgt_vendored.lib`；
-2. 属性管理器（View - Other Windows - Property Manager）右键工程，选择
-   “添加现有属性表”，选中 `libbgt-gbk.props`。
+学生工程**不需要配置任何字符集选项**，理由有两条：
 
-属性表做两件事：给所有 `.cpp` 加 `/source-charset:.936 /execution-charset:.936`，
-并定义 `BGT_SOURCE_ENCODING=BGT_ENCODING_GBK`。等价的命令行写法：
-
-```text
-cl /source-charset:.936 /execution-charset:.936 /I include main.cpp lib\bgt_vendored.lib
-```
+- 中文 Windows 上 MSVC 的默认源字符集与执行字符集就是 ANSI 代码页 936（GBK），
+  正好与库的期望一致；
+- 生成 GBK 版头文件时会写入一行 `#define BGT_SOURCE_ENCODING BGT_ENCODING_GBK`，
+  头文件自带构建模式声明，编译期检查与链接期检查都自动生效，工程侧不需要再定义
+  任何宏。
 
 注意：
 
-- 不要同时使用 `/utf-8`（与 `/execution-charset` 互斥，MSVC 报 D8016）；
-- `.936` 与 `utf-8` 是两种不同的写法：代码页要写成带点的数字（`.936`），
-  UTF-8 要写成名字（`utf-8`）。`/execution-charset:.utf-8` 这种写法会被 MSVC
-  静默忽略，因此头文件里有编译期检查兜底；
+- 不要给工程加 `/utf-8`。它既与 `/execution-charset` 互斥（MSVC 报 D8016），也会
+  把窄字符串变成 UTF-8、与库的 GBK 期望不符；这种情况下头文件的 `static_assert`
+  会直接给出提示；
+- 如果环境默认不是 936（英文 Windows，或系统开启了“Beta: 使用 UTF-8 提供全球语言
+  支持”），显式指定即可：
+
+  ```text
+  cl /source-charset:.936 /execution-charset:.936 /I include main.cpp lib\bgt_vendored.lib
+  ```
+
 - 头文件必须是 GBK 版。UTF-8 头文件被按 GBK 解析时会直接产生语法错误，所以
   GBK 模式的安装/打包会自动生成 GBK 版头文件（仓库里的 UTF-8 头文件供库自身
   与 UTF-8 模式使用）。
@@ -159,10 +162,12 @@ cl /source-charset:.936 /execution-charset:.936 /I include main.cpp lib\bgt_vend
 | 时机 | 机制 | 触发时的现象 |
 |---|---|---|
 | CMake 配置 | 选项取值校验、非 Windows 上使用 GBK 直接报错 | `FATAL_ERROR` |
-| 编译 | 头文件里的 `static_assert(sizeof("中") - 1 == 2)` | 明确的编译错误（含需要加的选项） |
+| 编译 | 头文件里的 `static_assert(sizeof("\u4E2D") - 1 == 2)`（通用字符名，不受头文件自身编码影响） | 明确的编译错误（含需要加的选项） |
 | 链接（MSVC） | `#pragma detect_mismatch` | `LNK2038`：头文件与库的编码模式不一致 |
 
-有了三层防呆，配错字符集不会表现为“能跑但中文是乱码”，而是直接构建失败。
+三层防呆都依赖头文件里自带的构建模式声明：GBK 版头文件由构建期工具写入
+`#define BGT_SOURCE_ENCODING BGT_ENCODING_GBK`，因此学生工程不需要在项目属性里
+定义任何宏。配错字符集不会表现为“能跑但中文是乱码”，而是直接构建失败。
 
 需要在特殊场景下关闭检查（例如把 libbgt 头文件放进预编译头）时，可以定义
 `BGT_DISABLE_ENCODING_CHECK`。
@@ -195,7 +200,7 @@ cmake -S . -B build-gbk -DBGT_BUILD_TESTS=ON -DBGT_SOURCE_ENCODING=GBK
 cmake --build build-gbk --config Release
 ctest --test-dir build-gbk -C Release
 
-# GBK 学生包（GBK 头文件 + 单库 + 属性表）
+# GBK 学生包（GBK 头文件 + 单库）
 cmake -S . -B build-dist -G "Visual Studio 18 2026" -A x64 \
   -DBGT_SOURCE_ENCODING=GBK -DBGT_BUILD_VENDORED=ON -DBGT_BUILD_EXAMPLES=OFF
 cmake --build build-dist --config Release

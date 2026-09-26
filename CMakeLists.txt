@@ -361,12 +361,12 @@ else()
 endif()
 if(BGT_ENCODING_IS_GBK)
     # 学生工程按 GBK 读取源码，因此分发的头文件也必须是 GBK（库自身仍用仓库里的
-    # UTF-8 头文件编译）。属性表让 Visual Studio 工程一步接入；其余说明见仓库里的
-    # docs/encoding.md，不进分发物。
+    # UTF-8 头文件编译）。生成的 GBK 头文件第一行就写入了
+    # BGT_SOURCE_ENCODING=BGT_ENCODING_GBK，自带构建模式声明：学生工程只要添加
+    # include 目录并链接库即可，既不用配字符集选项，也不用在项目属性里定义宏。
+    # 其余说明见仓库里的 docs/encoding.md，不进分发物。
     install(FILES "${BGT_GBK_HEADER}"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cmake/libbgt-gbk.props"
-        DESTINATION "." RENAME "libbgt-gbk.props")
 else()
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/include/bgt.h"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")

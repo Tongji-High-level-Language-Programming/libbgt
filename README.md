@@ -47,7 +47,7 @@ int main()
 
 ### 1. 获取源码
 
-SDL3 与 SDL3_ttf 以 Git Submodule 存放在 `third_party/` 下，克隆时一并拉取：
+SDL3、SDL3_ttf、SDL3_image 与 SDL3_mixer 以 Git Submodule 存放在 `third_party/` 下，克隆时一并拉取：
 
 ```bash
 git clone --recurse-submodules https://github.com/Tongji-High-level-Language-Programming/libbgt.git
@@ -122,13 +122,15 @@ cmake --build build-gbk
 
 1. 按上面的方式构建并安装 GBK 包（见下一节的命令，加上
    `-DBGT_SOURCE_ENCODING=GBK -DBGT_BUILD_VENDORED=ON`）；
-2. 工程里添加 `include` 目录、`lib` 目录并链接 `bgt_vendored.lib`；
-3. 在属性管理器里添加随包提供的 `libbgt-gbk.props`（等价于给所有 `.cpp` 加
-   `/source-charset:.936 /execution-charset:.936`）。
+2. 工程里添加 `include` 目录、`lib` 目录并链接 `bgt_vendored.lib`。
+
+不需要在工程里配置字符集：GBK 版头文件自带构建模式声明，而中文 Windows 上 MSVC
+的默认源字符集与执行字符集就是 GBK（代码页 936），正好匹配。
 
 需要注意：
 
-- 不要混用 `/utf-8`（与 `/execution-charset` 互斥，MSVC 报 D8016）；
+- 不要给工程加 `/utf-8`（它既与执行字符集选项互斥，也会让库收到的字符串变成
+  UTF-8）。万一环境默认不是 936，头文件的编译期检查会直接报错并告诉你该加什么；
 - 用错字符集时不会“能跑但中文乱码”：GBK 版头文件带编译期检查（执行字符集不对
   直接编译失败），MSVC 下还有链接期检查（头文件与库的编码模式不一致会报
   LNK2038）；
@@ -150,8 +152,6 @@ libbgt/
     exercises.md
     api-v0.2.md
     api-v0.3.md
-  cmake/
-    libbgt-gbk.props
   tools/
     bgt_transcode.cpp
   include/
@@ -241,7 +241,7 @@ package/
 ```
 
 GBK 课程走同一个流程，只需加上编码选项：安装出的头文件是 GBK 版（学生的 `.cpp`
-按 GBK 读取，UTF-8 头文件会被按 GBK 解析而报错），并附带 Visual Studio 属性表；
+按 GBK 读取，UTF-8 头文件会被按 GBK 解析而报错），学生工程不需要任何字符集设置；
 `cpack` 产出的包名带 `-gbk` 后缀以示区分。
 
 ```powershell
@@ -253,10 +253,8 @@ cmake --install build-dist-gbk --config Release --prefix package-gbk
 
 ```text
 package-gbk/
-  include/bgt.h            # GBK 编码
+  include/bgt.h            # GBK 编码，并自带构建模式声明
   lib/bgt_vendored.lib
-  libbgt-gbk.props         # Visual Studio 属性表（一步接入字符集选项）
-  libbgt-encoding.md       # 编码说明
 ```
 
 使用者在 Visual Studio 中添加 `include` 目录、`lib` 目录和
