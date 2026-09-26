@@ -19,6 +19,29 @@ option(BGT_BUILD_SHARED "Build libbgt as a shared library" OFF)
 option(BGT_BUILD_VENDORED "Merge libbgt and vendored dependencies into one MSVC static library" OFF)
 option(BGT_USE_SYSTEM_SDL "Use system-installed SDL3 and SDL3_ttf packages" OFF)
 
+# 运行期窄字符串编码，也就是学生源码所在的编码。UTF-8 是默认值，行为与旧版一致；
+# GBK 让学生的源码、printf 输出与存档文件统一保持 GBK，由 libbgt 在 SDL 边界做
+# GBK <-> UTF-8 转换。详见 docs/encoding.md。
+set(BGT_SOURCE_ENCODING "UTF-8" CACHE STRING
+    "Narrow string encoding used by user code: UTF-8 or GBK")
+set_property(CACHE BGT_SOURCE_ENCODING PROPERTY STRINGS UTF-8 GBK)
+
+string(TOUPPER "${BGT_SOURCE_ENCODING}" BGT_SOURCE_ENCODING_UPPER)
+if(BGT_SOURCE_ENCODING_UPPER STREQUAL "UTF-8" OR BGT_SOURCE_ENCODING_UPPER STREQUAL "UTF8")
+    set(BGT_ENCODING_IS_GBK OFF)
+elseif(BGT_SOURCE_ENCODING_UPPER STREQUAL "GBK")
+    set(BGT_ENCODING_IS_GBK ON)
+else()
+    message(FATAL_ERROR
+        "BGT_SOURCE_ENCODING must be UTF-8 or GBK, got '${BGT_SOURCE_ENCODING}'")
+endif()
+
+if(BGT_ENCODING_IS_GBK AND NOT WIN32)
+    message(FATAL_ERROR
+        "BGT_SOURCE_ENCODING=GBK is currently implemented on Windows only "
+        "(WinAPI); the iconv backend is reserved, see docs/encoding.md")
+endif()
+
 if(BGT_BUILD_VENDORED AND (NOT MSVC OR BGT_BUILD_SHARED OR BGT_USE_SYSTEM_SDL))
     message(FATAL_ERROR
         "BGT_BUILD_VENDORED requires MSVC, bundled SDL, and BGT_BUILD_SHARED=OFF")
@@ -51,12 +74,31 @@ endif()
 # 仓库内的源码都是 UTF-8 文件，所以默认的 UTF-8 模式就是 MSVC 的 /utf-8。
 function(bgt_apply_text_encoding target)
     if(MSVC)
-        target_compile_options(${target} PRIVATE /utf-8)
+        if(BGT_ENCODING_IS_GBK)
+            # 源码是 UTF-8 文件，但运行期窄字符串要是 GBK：源字符集 UTF-8、执行字符集
+            # 936。/utf-8 与 /execution-charset 互斥（D8016），不能同时使用。
+            target_compile_options(${target} PRIVATE
+                /source-charset:utf-8 /execution-charset:.936)
+        else()
+            target_compile_options(${target} PRIVATE /utf-8)
+        endif()
+    elseif(BGT_ENCODING_IS_GBK)
+        # GCC / Clang：同样是“UTF-8 源码 -> GBK 执行字符集”，依赖编译器的 iconv 支持。
+        target_compile_options(${target} PRIVATE
+            -finput-charset=UTF-8 -fexec-charset=GBK)
     endif()
 endfunction()
 
-add_library(bgt ${BGT_LIBRARY_TYPE} src/bgt.cpp)
+add_library(bgt ${BGT_LIBRARY_TYPE} src/bgt.cpp src/bgt_encoding.cpp)
 add_library(libbgt::bgt ALIAS bgt)
+
+# 库自身始终按 UTF-8 编译（源码与中文注释都是 UTF-8，与 BGT_SOURCE_ENCODING 无关）。
+# BGT_BUILDING_LIBRARY 关闭头文件里面向消费端的编译期编码检查。
+target_compile_definitions(bgt PRIVATE BGT_BUILDING_LIBRARY)
+if(BGT_ENCODING_IS_GBK)
+    # 公开传递，让消费端头文件里的编码检查与库的构建模式一致。
+    target_compile_definitions(bgt PUBLIC BGT_SOURCE_ENCODING=BGT_ENCODING_GBK)
+endif()
 
 target_compile_features(bgt PUBLIC cxx_std_20)
 set_target_properties(bgt PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
@@ -221,6 +263,16 @@ if(BGT_BUILD_TESTS)
         CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
     bgt_apply_text_encoding(bgt_test_storage)
     add_test(NAME bgt_test_storage COMMAND bgt_test_storage)
+
+    add_executable(bgt_test_encoding tests/test_encoding.cpp)
+    target_link_libraries(bgt_test_encoding PRIVATE libbgt::bgt)
+    set_target_properties(bgt_test_encoding PROPERTIES CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
+    bgt_apply_text_encoding(bgt_test_encoding)
+    # 该测试直接验证内部转换层，需要能包含 src/bgt_encoding.h。
+    target_include_directories(bgt_test_encoding PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    add_test(NAME bgt_test_encoding COMMAND bgt_test_encoding)
 
     add_executable(bgt_test_sound tests/test_sound.cpp)
     target_link_libraries(bgt_test_sound PRIVATE libbgt::bgt)

@@ -85,8 +85,8 @@ int main()
     BGT_CHECK(!bgt_hit_circle_rect(5, 5, -3, 0, 0, 10, 10));  // 负半径
     BGT_CHECK(!bgt_hit_circle_rect(5, 5, 3, 0, 0, 0, 10));    // 零宽矩形
 
-    // 6) 极端坐标：内部用 long long，坐标差 ±3×10⁹ 内不溢出
-    //    （下面的 x+width 与 d² 若用 int 计算都会溢出）
+    // 6) 极端坐标：内部用 long long，坐标差 ±3×10^9 内不溢出
+    //    （下面的 x+width 与 d^2 若用 int 计算都会溢出）
     BGT_CHECK(bgt_hit_point_rect(2147483647, 5, 2000000000, 0,
                                 2000000000, 10));
     BGT_CHECK(bgt_hit_rect_rect(2000000000, 0, 100000000, 10,

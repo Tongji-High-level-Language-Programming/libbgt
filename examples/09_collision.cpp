@@ -352,7 +352,7 @@ int main()
                           "方向键移动绿圆慢慢靠近灰圆——真正压上才会变红。",
                           20);
             bgt_draw_text(40, 162,
-                          "试试停在“看起来刚碰上”的位置：d² 恰好等于 (r1+r2)²，"
+                          "试试停在“看起来刚碰上”的位置：d^2 恰好等于 (r1+r2)^2，"
                           "返回的仍是不碰！",
                           20);
 
@@ -376,20 +376,20 @@ int main()
             char dist_text[160];
             if (dist_sq == radius_sum * radius_sum) {
                 std::snprintf(dist_text, sizeof(dist_text),
-                              "d² = %d，(r1+r2)² = %d —— 现在正好相切："
+                              "d^2 = %d，(r1+r2)^2 = %d —— 现在正好相切："
                               "看起来碰上了，但返回 false！",
                               dist_sq, radius_sum * radius_sum);
                 bgt_set_color(BGT_RED);
             }
             else if (hit) {
                 std::snprintf(dist_text, sizeof(dist_text),
-                              "d² = %d < (r1+r2)² = %d —— 实际重叠：命中！",
+                              "d^2 = %d < (r1+r2)^2 = %d —— 实际重叠：命中！",
                               dist_sq, radius_sum * radius_sum);
                 bgt_set_color(BGT_BLACK);
             }
             else {
                 std::snprintf(dist_text, sizeof(dist_text),
-                              "d² = %d > (r1+r2)² = %d —— 还没碰上",
+                              "d^2 = %d > (r1+r2)^2 = %d —— 还没碰上",
                               dist_sq, radius_sum * radius_sum);
                 bgt_set_color(BGT_BLACK);
             }

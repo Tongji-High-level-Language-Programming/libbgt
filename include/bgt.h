@@ -10,6 +10,20 @@
 #define BGT_VERSION_MINOR 1
 #define BGT_VERSION_PATCH 0
 
+// 窄字符串在运行期使用的编码，由构建选项 BGT_SOURCE_ENCODING 决定：
+//   BGT_ENCODING_UTF8（默认）：源码与运行期都是 UTF-8，库不做任何转换。
+//   BGT_ENCODING_GBK          ：学生源码与运行期窄字符串都是 GBK（Windows 代码页
+//                              936），库在 SDL 边界自动完成 GBK <-> UTF-8 转换，
+//                              存档文件、printf 输出与错误文本都保持 GBK。
+// 构建系统会传 -DBGT_SOURCE_ENCODING=BGT_ENCODING_GBK；分发的 GBK 版头文件里也
+// 直接写死了这个定义，因此学生工程只要按 GBK 编译即可。详见 docs/encoding.md。
+#define BGT_ENCODING_UTF8 0
+#define BGT_ENCODING_GBK 1
+
+#ifndef BGT_SOURCE_ENCODING
+#define BGT_SOURCE_ENCODING BGT_ENCODING_UTF8
+#endif
+
 #ifdef _MSC_VER
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "winmm.lib")
