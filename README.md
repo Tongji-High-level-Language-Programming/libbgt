@@ -60,6 +60,15 @@ cd libbgt
 git submodule update --init --recursive
 ```
 
+> **为什么 `git submodule update` 之后 `git status` 还是“不干净”？**
+> 配置 CMake 时，`third_party/SDL_image/external/zlib` 里的 `zconf.h` 会被 zlib 自带的
+> `CMakeLists.txt` 改名为 `zconf.h.included`（上游刻意如此：让 CMake 在构建目录里生成一份
+> 配置好的 `zconf.h`）。所以构建之后 `git status` 会显示
+> `modified: third_party/SDL_image (modified content)`，这不是子模块没拉全，重跑
+> `git submodule update --init --recursive` 也不会有任何变化。
+> 本仓库已在 `.gitmodules` 中为 `third_party/SDL_image` 设置 `ignore = dirty` 来屏蔽这类
+> 构建噪音；子模块 commit 与父仓库记录不一致时仍会正常报告。
+
 ### 2. 构建
 
 ```bash
