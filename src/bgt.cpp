@@ -1,5 +1,7 @@
 #include "bgt.h"
 
+#include "bgt_encoding.h"
+
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
 #include <SDL3_image/SDL_image.h>
@@ -16,6 +18,7 @@
 #include <deque>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <map>
 #include <random>
 #include <string>
@@ -134,8 +137,10 @@ struct State {
         ErrorEntry entry;
         entry.code = code;
         entry.message = message;
-        const char *sdl_error = SDL_GetError();
-        if (sdl_error != nullptr && sdl_error[0] != '\0') {
+        // SDL 的错误文本是 UTF-8，先转回源编码再拼接：错误历史里只保留一种编码
+        // （源编码），bgt_error_text() 与 bgt_print_error() 才能直接使用。
+        const std::string sdl_error = bgt::from_utf8(SDL_GetError());
+        if (!sdl_error.empty()) {
             entry.message += ": ";
             entry.message += sdl_error;
         }
@@ -329,7 +334,9 @@ std::string join_path(const std::string &left, const std::string &right)
 
 bool file_exists(const std::string &path)
 {
-    SDL_IOStream *stream = SDL_IOFromFile(path.c_str(), "rb");
+    // SDL 的文件接口按 UTF-8 解释路径，path 是源编码。
+    const bgt::Utf8View utf8_path(path.c_str());
+    SDL_IOStream *stream = SDL_IOFromFile(utf8_path.c_str(), "rb");
     if (stream == nullptr) {
         return false;
     }
@@ -353,6 +360,8 @@ std::vector<std::string> default_font_candidates()
 {
     std::vector<std::string> candidates;
 #ifdef _WIN32
+    // SDL_getenv 在 Windows 上走 GetEnvironmentVariableA，返回 ANSI 字符串，正好
+    // 与源编码一致，因此这里不转换（WINDIR 实际上总是 ASCII 路径）。
     const char *win_dir = SDL_getenv("WINDIR");
     const std::string font_dir =
         win_dir == nullptr ? "C:/Windows/Fonts" : join_path(win_dir, "Fonts");
@@ -407,8 +416,10 @@ TTF_Font *get_font(State &s, int size)
         }
     }
 
+    // 字体路径在库内按源编码保存，SDL_ttf 需要 UTF-8。
+    const bgt::Utf8View utf8_font_path(s.font_path.c_str());
     TTF_Font *font =
-        TTF_OpenFont(s.font_path.c_str(), static_cast<float>(size));
+        TTF_OpenFont(utf8_font_path.c_str(), static_cast<float>(size));
     if (font == nullptr) {
         s.set_error(BGT_ERROR_FONT, "failed to open font " + s.font_path);
         return nullptr;
@@ -652,7 +663,9 @@ void apply_fps_limit(State &s)
 }
 
 
-void draw_text_impl(State &s, int x, int y, const char text[], int size)
+// text 必须是 UTF-8：静态文本由 bgt_draw_text() 转换，错误消息由
+// draw_wrapped_error() 转换，这里不再做编码转换。
+void draw_text_utf8_impl(State &s, int x, int y, const char text[], int size)
 {
     if (!ensure_open(s) || text == nullptr || text[0] == '\0') {
         return;
@@ -694,7 +707,8 @@ void draw_text_impl(State &s, int x, int y, const char text[], int size)
     SDL_DestroyTexture(texture);
 }
 
-int text_size_impl(State &s, const char text[], int size, bool width)
+// text 必须是 UTF-8，理由同 draw_text_utf8_impl()。
+int text_size_utf8_impl(State &s, const char text[], int size, bool width)
 {
     if (!ensure_open(s) || text == nullptr || text[0] == '\0') {
         return 0;
@@ -794,8 +808,9 @@ bool open_window_impl(int width, int height, const char title[],
     }
     s.ttf_ready = true;
 
-    s.window = SDL_CreateWindow(title == nullptr ? "libbgt" : title, width,
-                                height, flags);
+    // 窗口标题是 UTF-8 字符串，title 是源编码。
+    const bgt::Utf8View utf8_title(title == nullptr ? "libbgt" : title);
+    s.window = SDL_CreateWindow(utf8_title.c_str(), width, height, flags);
     if (s.window == nullptr) {
         s.set_error(BGT_ERROR_WINDOW, "failed to create window");
         s.close();
@@ -940,7 +955,8 @@ void bgt_set_window_title(const char title[])
 {
     State &s = state();
     if (s.window != nullptr) {
-        SDL_SetWindowTitle(s.window, title == nullptr ? "" : title);
+        const bgt::Utf8View utf8_title(title == nullptr ? "" : title);
+        SDL_SetWindowTitle(s.window, utf8_title.c_str());
     }
 }
 
@@ -1466,7 +1482,9 @@ int bgt_load_image(const char filename[])
         return BGT_IMAGE_NONE;
     }
 
-    SDL_Surface *surface = IMG_Load(filename);
+    // SDL_image 按 UTF-8 解释路径，filename 是源编码；错误消息里仍用源编码原文。
+    const bgt::Utf8View utf8_filename(filename);
+    SDL_Surface *surface = IMG_Load(utf8_filename.c_str());
     if (surface == nullptr) {
         s.set_error(BGT_ERROR_IMAGE,
                     std::string("failed to load image ") + filename);
@@ -1668,34 +1686,40 @@ int bgt_get_font_size()
 void bgt_draw_text(int x, int y, const char text[])
 {
     State &s = state();
-    draw_text_impl(s, x, y, text, s.font_size);
+    const bgt::Utf8View utf8_text(text);
+    draw_text_utf8_impl(s, x, y, utf8_text.c_str(), s.font_size);
 }
 
 void bgt_draw_text(int x, int y, const char text[], int size)
 {
-    draw_text_impl(state(), x, y, text, size);
+    const bgt::Utf8View utf8_text(text);
+    draw_text_utf8_impl(state(), x, y, utf8_text.c_str(), size);
 }
 
 int bgt_text_width(const char text[])
 {
     State &s = state();
-    return text_size_impl(s, text, s.font_size, true);
+    const bgt::Utf8View utf8_text(text);
+    return text_size_utf8_impl(s, utf8_text.c_str(), s.font_size, true);
 }
 
 int bgt_text_width(const char text[], int size)
 {
-    return text_size_impl(state(), text, size, true);
+    const bgt::Utf8View utf8_text(text);
+    return text_size_utf8_impl(state(), utf8_text.c_str(), size, true);
 }
 
 int bgt_text_height(const char text[])
 {
     State &s = state();
-    return text_size_impl(s, text, s.font_size, false);
+    const bgt::Utf8View utf8_text(text);
+    return text_size_utf8_impl(s, utf8_text.c_str(), s.font_size, false);
 }
 
 int bgt_text_height(const char text[], int size)
 {
-    return text_size_impl(state(), text, size, false);
+    const bgt::Utf8View utf8_text(text);
+    return text_size_utf8_impl(state(), utf8_text.c_str(), size, false);
 }
 
 bool bgt_key_is_down(int key)
@@ -1934,20 +1958,51 @@ std::string trim_copy(const std::string &text)
 }
 
 // 节名规则：非空，且不含 [、] 和换行（否则写进文件后会解析不回来）。
+// 必须按字符边界搜索：GBK 双字节字符的尾字节可以是 [ ]，直接 find() 会误判。
 bool valid_section_name(const std::string &name)
 {
-    return !name.empty() && name.find('[') == std::string::npos &&
-           name.find(']') == std::string::npos &&
-           name.find('\n') == std::string::npos;
+    return !name.empty() && !bgt::encoded_contains_ascii(name, '[') &&
+           !bgt::encoded_contains_ascii(name, ']') &&
+           !bgt::encoded_contains_ascii(name, '\n');
 }
 
 // 键名规则：非空，不含 = 和换行；且首字符不能是 # 或 [——否则写盘后
 // 会被读回逻辑误判成注释行或节头，存档读不回来。
+// 同样按字符边界搜索；front() 可以直接比较，因为双字节字符的首字节 >= 0x81，
+// 不可能是 ASCII。
 bool valid_key_name(const std::string &name)
 {
-    return !name.empty() && name.find('=') == std::string::npos &&
-           name.find('\n') == std::string::npos &&
-           name.front() != '#' && name.front() != '[';
+    return !name.empty() && !bgt::encoded_contains_ascii(name, '=') &&
+           !bgt::encoded_contains_ascii(name, '\n') && name.front() != '#' &&
+           name.front() != '[';
+}
+
+// 按 '\n' 切分文本，行内不含行尾的 '\n'（与 std::getline 的行划分一致）。
+std::vector<std::string> split_lines(const std::string &text)
+{
+    std::vector<std::string> lines;
+    std::size_t start = 0;
+    while (start < text.size()) {
+        const std::size_t end = text.find('\n', start);
+        if (end == std::string::npos) {
+            lines.push_back(text.substr(start));
+            break;
+        }
+        lines.push_back(text.substr(start, end - start));
+        start = end + 1;
+    }
+    return lines;
+}
+
+// 存档文件的内容可能是记事本写出的 UTF-8（带 BOM）：先按 UTF-8 解释并转回源
+// 编码，之后的整条解析路径就只面对一种编码。没有 BOM 时按源编码解释——libbgt
+// 自己写出的存档就是源编码，学生用记事本按 ANSI 保存的也是源编码。
+std::string storage_file_text(const std::string &content)
+{
+    if (content.rfind("\xEF\xBB\xBF", 0) == 0) {
+        return bgt::from_utf8(content.substr(3));
+    }
+    return content;
 }
 
 // 整理并校验节名与键名。不合法时记录错误并返回 false。
@@ -2026,29 +2081,6 @@ bool parse_double_text(const std::string &text, double &value_out)
     }
     value_out = value;
     return true;
-}
-
-// 截断到 limit 字节内最后一个完整的 UTF-8 字符：中文不会被切一半，
-// 输出永远是合法的 UTF-8 文本。
-std::size_t utf8_prefix_length(const std::string &text, std::size_t limit)
-{
-    std::size_t length = 0;
-    while (length < text.size() && length < limit) {
-        const auto byte = static_cast<unsigned char>(text[length]);
-        std::size_t char_bytes = 1;
-        if ((byte & 0xF8U) == 0xF0U) {
-            char_bytes = 4;
-        } else if ((byte & 0xF0U) == 0xE0U) {
-            char_bytes = 3;
-        } else if ((byte & 0xE0U) == 0xC0U) {
-            char_bytes = 2;
-        }
-        if (length + char_bytes > limit || length + char_bytes > text.size()) {
-            break;
-        }
-        length += char_bytes;
-    }
-    return length;
 }
 
 } // namespace
@@ -2219,7 +2251,7 @@ void bgt_get_string(const char section[], const char key[], char out[],
         std::memcpy(out, text.c_str(), text.size() + 1);
         return;
     }
-    const std::size_t prefix = utf8_prefix_length(text, limit);
+    const std::size_t prefix = bgt::encoded_prefix_length(text, limit);
     std::memcpy(out, text.c_str(), prefix);
     out[prefix] = '\0';
     s.set_error(BGT_ERROR_STORAGE,
@@ -2233,10 +2265,12 @@ bool bgt_load(const char filename[])
         s.set_error(BGT_ERROR_STORAGE, "storage filename is empty");
         return false;
     }
-    std::ifstream file(filename, std::ios::in | std::ios::binary);
+    // 窄路径在 Windows 上按 ANSI 解释，先转成本机文件系统路径（UTF-16）。
+    const std::filesystem::path native_path = bgt::to_native_path(filename);
+    std::ifstream file(native_path, std::ios::in | std::ios::binary);
     if (!file) {
         std::error_code probe_error;
-        if (std::filesystem::exists(filename, probe_error)) {
+        if (std::filesystem::exists(native_path, probe_error)) {
             s.set_error(BGT_ERROR_STORAGE,
                         "failed to open storage file " +
                             std::string(filename));
@@ -2246,19 +2280,21 @@ bool bgt_load(const char filename[])
         s.storage.clear();
         return true;
     }
-    // 容忍记事本写出的 UTF-8 BOM。
-    char bom[3] = {};
-    file.read(bom, 3);
-    if (!(bom[0] == '\xEF' && bom[1] == '\xBB' && bom[2] == '\xBF')) {
-        file.clear();
-        file.seekg(0);
+    const std::string content((std::istreambuf_iterator<char>(file)),
+                              std::istreambuf_iterator<char>());
+    if (file.bad()) {
+        s.set_error(BGT_ERROR_STORAGE,
+                    "failed while reading storage file " +
+                        std::string(filename));
+        return false;
     }
+    const std::string text = storage_file_text(content);
     s.storage.clear();
-    std::string line;
     std::string section;
     bool in_section = false; // 节头之前（或坏节头之后）的键值行判为坏行
     bool all_lines_ok = true;
-    while (std::getline(file, line)) {
+    for (const std::string &raw_line : split_lines(text)) {
+        std::string line = raw_line;
         if (!line.empty() && line.back() == '\r') {
             line.pop_back();
         }
@@ -2269,7 +2305,7 @@ bool bgt_load(const char filename[])
         if (trimmed.front() == '[') {
             std::string name;
             bool ok = false;
-            if (trimmed.back() == ']') {
+            if (bgt::encoded_ends_with_ascii(trimmed, ']')) {
                 name = trim_copy(trimmed.substr(1, trimmed.size() - 2));
                 ok = valid_section_name(name);
             }
@@ -2302,12 +2338,6 @@ bool bgt_load(const char filename[])
         const std::string value = trim_copy(line.substr(eq + 1));
         s.storage[section][key] = value;
     }
-    if (file.bad()) {
-        s.set_error(BGT_ERROR_STORAGE,
-                    "failed while reading storage file " +
-                        std::string(filename));
-        return false;
-    }
     return all_lines_ok;
 }
 
@@ -2319,9 +2349,10 @@ bool bgt_save(const char filename[])
         return false;
     }
     // 先写临时文件，成功后再整体替换，避免写一半把旧存档弄坏。
+    // 存档内容按源编码写出（GBK 模式下就是 GBK），与学生的源码编码保持一致。
     const std::string temp_name = std::string(filename) + ".tmp";
     {
-        std::ofstream file(temp_name,
+        std::ofstream file(bgt::to_native_path(temp_name),
                            std::ios::out | std::ios::binary | std::ios::trunc);
         if (!file) {
             s.set_error(BGT_ERROR_STORAGE,
@@ -2343,14 +2374,17 @@ bool bgt_save(const char filename[])
                         "failed while writing storage file " + temp_name);
             // 写坏的临时文件是残渣：删掉，不留 “*.tmp” 尾巴。
             std::error_code cleanup_error;
-            std::filesystem::remove(temp_name, cleanup_error);
+            std::filesystem::remove(bgt::to_native_path(temp_name),
+                                    cleanup_error);
             return false;
         }
     }
     std::error_code rename_error;
-    std::filesystem::remove(filename, rename_error); // 目标存在时先移除
+    // 目标存在时先移除；两步都用本机路径（Windows 下是 UTF-16）。
+    std::filesystem::remove(bgt::to_native_path(filename), rename_error);
     rename_error.clear();
-    std::filesystem::rename(temp_name, filename, rename_error);
+    std::filesystem::rename(bgt::to_native_path(temp_name),
+                            bgt::to_native_path(filename), rename_error);
     if (rename_error) {
         s.set_error(BGT_ERROR_STORAGE,
                     "failed to replace storage file " +
@@ -2371,7 +2405,9 @@ int bgt_load_sound(const char filename[])
     if (!ensure_audio()) {
         return 0;
     }
-    MIX_Audio *audio = MIX_LoadAudio(s.audio_mixer, filename, false);
+    // SDL_mixer 按 UTF-8 解释路径，filename 是源编码；错误消息里仍用源编码原文。
+    const bgt::Utf8View utf8_filename(filename);
+    MIX_Audio *audio = MIX_LoadAudio(s.audio_mixer, utf8_filename.c_str(), false);
     if (audio == nullptr) {
         s.set_error(BGT_ERROR_AUDIO,
                     "failed to load sound " + std::string(filename));
@@ -2445,7 +2481,9 @@ bool bgt_play_music(const char filename[])
     }
     // 流式：不把整个文件读进内存，边读边解码（内存占用与时长无关）。
     // closeio=true：换曲或销毁轨道时由 mixer 自动关闭旧文件。
-    SDL_IOStream *io = SDL_IOFromFile(filename, "rb");
+    // SDL 按 UTF-8 解释路径，filename 是源编码。
+    const bgt::Utf8View utf8_filename(filename);
+    SDL_IOStream *io = SDL_IOFromFile(utf8_filename.c_str(), "rb");
     if (io == nullptr) {
         s.set_error(BGT_ERROR_AUDIO,
                     "failed to open music " + std::string(filename));
@@ -2477,7 +2515,7 @@ bool bgt_file_exists(const char filename[])
         return false;
     }
     std::error_code error;
-    return std::filesystem::exists(filename, error);
+    return std::filesystem::exists(bgt::to_native_path(filename), error);
 }
 
 void bgt_stop_music()
@@ -2501,10 +2539,10 @@ void bgt_set_music_volume(int volume)
 
 namespace {
 
-// 把 text 的前 out_size - 1 个字节按 UTF-8 字符边界截断后复制进 out，
+// 把 text 的前 out_size - 1 个字节按源编码的字符边界截断后复制进 out，
 // 保证不会切在多字节字符中间，并补上结束符。查询辅助，绝不记错误。
 // 命名避开平行分支的同名助手（合体时统一）。
-void utf8_prefix_copy(const std::string &text, char out[], int out_size)
+void prefix_copy(const std::string &text, char out[], int out_size)
 {
     if (out == nullptr || out_size <= 0) {
         return;
@@ -2513,28 +2551,28 @@ void utf8_prefix_copy(const std::string &text, char out[], int out_size)
     if (static_cast<int>(text.size()) < limit) {
         limit = static_cast<int>(text.size());
     }
-    // UTF-8 续字节形如 10xxxxxx：截断点落在字符中间就向前退到边界。
-    while (limit > 0 &&
-           (static_cast<unsigned char>(text[limit]) & 0xC0U) == 0x80U) {
-        limit = limit - 1;
-    }
-    for (int i = 0; i < limit; i = i + 1) {
+    const std::size_t length =
+        bgt::encoded_prefix_length(text, static_cast<std::size_t>(limit));
+    for (std::size_t i = 0; i < length; i = i + 1) {
         out[i] = text[i];
     }
-    out[limit] = '\0';
+    out[length] = '\0';
 }
 
 // 把一条错误消息按最大宽度逐行绘制：先用 TTF_MeasureString 量出本行
 // 能放下的字节数，再回退到本行范围内的最后一个空格（优先在空格断行），
-// 行内没有空格才在量出的边界硬断。UTF-8 多字节字符不会被切开。
+// 行内没有空格才在量出的边界硬断。测量与绘制都基于 UTF-8，所以先把源编码的
+// 消息整体转成 UTF-8，再按 UTF-8 字节偏移切行，多字节字符不会被切开。
 // 消息按值传入：循环内的绘制失败会记新错误，环形队列的 push/pop 可能
 // 使按引用传入的历史条目失效（index 0 且历史满时的悬空引用）。
 void draw_wrapped_error(State &s, int x, int y, int size,
                         std::string message)
 {
+    // message 已经是本次调用的副本，直接原地换成 UTF-8。
+    message = bgt::to_utf8(message);
     const int max_width = s.width - x - 16;
     if (max_width <= 0) {
-        draw_text_impl(s, x, y, message.c_str(), size);
+        draw_text_utf8_impl(s, x, y, message.c_str(), size);
         return;
     }
     TTF_Font *font = get_font(s, size);
@@ -2554,7 +2592,7 @@ void draw_wrapped_error(State &s, int x, int y, int size,
                                &measured_width, &measured_length) ||
             measured_length == 0) {
             // 测量失败或一个字符都放不下：剩余部分当一行画，避免死循环。
-            draw_text_impl(s, x, line_y, rest.c_str(), size);
+            draw_text_utf8_impl(s, x, line_y, rest.c_str(), size);
             return;
         }
         std::size_t break_at = start + measured_length;
@@ -2567,7 +2605,7 @@ void draw_wrapped_error(State &s, int x, int y, int size,
             }
         }
         const std::string line = message.substr(start, break_at - start);
-        draw_text_impl(s, x, line_y, line.c_str(), size);
+        draw_text_utf8_impl(s, x, line_y, line.c_str(), size);
         line_y = line_y + line_height;
         start = break_at;
         while (start < message.size() && message[start] == ' ') {
@@ -2612,7 +2650,7 @@ void bgt_error_text(int index, char out[], int out_size)
         out[0] = '\0';
         return;
     }
-    utf8_prefix_copy(
+    prefix_copy(
         s.errors[static_cast<std::size_t>(index)].message, out, out_size);
 }
 

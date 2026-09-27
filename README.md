@@ -11,6 +11,8 @@
 - 基础接口不要求使用类、对象、结构体或指针。
 - 默认只管理一个窗口和一张隐式画布。
 - 中文显示开箱可用，默认使用系统中文字体。
+- 源码编码可切换：默认 UTF-8，也可以让整门课程统一使用 GBK，库在 SDL 边界自动
+  转换（见[编码支持](docs/encoding.md)）。
 - 项目使用 CMake 构建。
 - SDL3、SDL3_ttf、SDL3_image 与 SDL3_mixer 通过 Git Submodule 管理。
 - SDL3、SDL3_ttf、SDL3_image、SDL3_mixer 及其解码依赖默认静态链接，生成的示例程序无需附带 SDL DLL。
@@ -45,7 +47,7 @@ int main()
 
 ### 1. 获取源码
 
-SDL3 与 SDL3_ttf 以 Git Submodule 存放在 `third_party/` 下，克隆时一并拉取：
+SDL3、SDL3_ttf、SDL3_image 与 SDL3_mixer 以 Git Submodule 存放在 `third_party/` 下，克隆时一并拉取：
 
 ```bash
 git clone --recurse-submodules https://github.com/Tongji-High-level-Language-Programming/libbgt.git
@@ -99,9 +101,43 @@ cmake --build build
 | `BGT_BUILD_SHARED` | `OFF` | 编译为共享库（默认静态） |
 | `BGT_BUILD_VENDORED` | `OFF` | MSVC 下把库与依赖合并为单个 `bgt_vendored.lib`（见下文） |
 | `BGT_USE_SYSTEM_SDL` | `OFF` | 使用系统安装的 SDL3 / SDL3_ttf / SDL3_image / SDL3_mixer 包 |
+| `BGT_SOURCE_ENCODING` | `UTF-8` | 运行期窄字符串编码（也就是学生源码编码）：`UTF-8` 或 `GBK` |
 
 如改用系统安装的依赖，请确保其同时提供静态 CMake 目标，然后配置
 `-DBGT_USE_SYSTEM_SDL=ON`。
+
+## GBK 编码支持（课程使用）
+
+SDL3 与 SDL3_ttf 要求 UTF-8，而课程可以继续让学生使用 GBK：把
+`BGT_SOURCE_ENCODING` 设为 `GBK` 之后，学生的源码、`printf` 输出、存档文件都是
+GBK，libbgt 在真正跨越 SDL 边界的地方（窗口标题、文本绘制与测量、图片/声音/字体
+路径、SDL 错误文本）自动做 GBK 与 UTF-8 的双向转换。学生代码不需要任何额外调用。
+
+```bash
+cmake -S . -B build-gbk -DBGT_SOURCE_ENCODING=GBK
+cmake --build build-gbk
+```
+
+面向学生的 Visual Studio 工程（GBK 头文件 + 单个静态库）：
+
+1. 按上面的方式构建并安装 GBK 包（见下一节的命令，加上
+   `-DBGT_SOURCE_ENCODING=GBK -DBGT_BUILD_VENDORED=ON`）；
+2. 工程里添加 `include` 目录、`lib` 目录并链接 `bgt_vendored.lib`。
+
+不需要在工程里配置字符集：GBK 版头文件自带构建模式声明，而中文 Windows 上 MSVC
+的默认源字符集与执行字符集就是 GBK（代码页 936），正好匹配。
+
+需要注意：
+
+- 不要给工程加 `/utf-8`（它既与执行字符集选项互斥，也会让库收到的字符串变成
+  UTF-8）。万一环境默认不是 936，头文件的编译期检查会直接报错并告诉你该加什么；
+- 用错字符集时不会“能跑但中文乱码”：GBK 版头文件带编译期检查（执行字符集不对
+  直接编译失败），MSVC 下还有链接期检查（头文件与库的编码模式不一致会报
+  LNK2038）；
+- 同一个 `char` 数组容量在两种模式下的可见字符数不同（GBK 一个汉字 2 字节，
+  UTF-8 3 字节）。
+
+细节、转换点清单、已知限制与验证方式见[编码支持](docs/encoding.md)。
 
 ## 项目结构
 
@@ -111,10 +147,13 @@ libbgt/
   README.md
   docs/
     design.md
+    encoding.md
     api-v0.md
     exercises.md
     api-v0.2.md
     api-v0.3.md
+  tools/
+    bgt_transcode.cpp
   include/
     bgt.h
   src/
@@ -201,6 +240,23 @@ package/
   lib/bgt_vendored.lib
 ```
 
+GBK 课程走同一个流程，只需加上编码选项：安装出的头文件是 GBK 版（学生的 `.cpp`
+按 GBK 读取，UTF-8 头文件会被按 GBK 解析而报错），学生工程不需要任何字符集设置；
+`cpack` 产出的包名带 `-gbk` 后缀以示区分。
+
+```powershell
+cmake -S . -B build-dist-gbk -G "Visual Studio 18 2026" -A x64 `
+  -DBGT_SOURCE_ENCODING=GBK -DBGT_BUILD_VENDORED=ON -DBGT_BUILD_EXAMPLES=OFF
+cmake --build build-dist-gbk --config Release
+cmake --install build-dist-gbk --config Release --prefix package-gbk
+```
+
+```text
+package-gbk/
+  include/bgt.h            # GBK 编码，并自带构建模式声明
+  lib/bgt_vendored.lib
+```
+
 使用者在 Visual Studio 中添加 `include` 目录、`lib` 目录和
 `bgt_vendored.lib` 即可。头文件会为 MSVC 自动声明 SDL 所需的 Windows 系统
 库，因此无需逐项配置 SDL 的传递依赖。文本绘制默认使用系统自带的中文字体，
@@ -211,6 +267,7 @@ package/
 ## 文档
 
 - [设计文档](docs/design.md)
+- [编码支持（UTF-8 / GBK）](docs/encoding.md)
 - [首版 API 文档](docs/api-v0.md)
 - [作业题库（汉诺塔/打砖块/扫雷/太空射击）](docs/exercises.md)
 - [v0.2 API 文档（图片、随机数、碰撞检测）](docs/api-v0.2.md)

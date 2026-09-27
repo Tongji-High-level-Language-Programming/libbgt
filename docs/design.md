@@ -10,7 +10,8 @@
 
 - 使用简单：基础接口只使用普通函数。
 - 概念简单：默认只有一个窗口、一张隐式画布、一个主循环。
-- 中文友好：默认使用系统中文字体，支持 UTF-8 中文显示。
+- 中文友好：默认使用系统中文字体；支持 UTF-8 与 GBK 两种源码编码下的中文显示
+  （见[编码支持](encoding.md)）。
 - 工程可控：项目使用 CMake 构建，SDL3 与 SDL3_ttf 通过 Git Submodule 管理。
 - 适合教学：不把高阶封装提前提供给学生，把抽象、封装和设计练习留给课程后半段。
 - 可渐进扩展：基础函数式接口稳定后，可以在其上构建现代 C++ 封装层。
@@ -249,8 +250,9 @@ unsigned bgt_rgba(int r, int g, int b, int a);
 
 要求：
 
-- 源码字符串按 UTF-8 解释。
-- `bgt_draw_text(x, y, "你好", size)` 默认可用。
+- 源码字符串按“源编码”解释：默认 UTF-8，也可以用 `BGT_SOURCE_ENCODING=GBK` 让
+  整门课程统一使用 GBK；库在把字符串交给 SDL3_ttf 之前转换成 UTF-8。
+- `bgt_draw_text(x, y, "你好", size)` 在两种模式下默认可用。
 - 默认使用系统自带的中文字体。
 - 默认字体覆盖常用中文字符。
 - 字体加载失败时不崩溃，并提供错误信息。
@@ -276,9 +278,16 @@ unsigned bgt_rgba(int r, int g, int b, int a);
 
 编码约定：
 
-- 示例文件保存为 UTF-8。
-- MSVC 推荐启用 `/utf-8`。
-- CMake 应为 MSVC 自动添加 `/utf-8` 编译选项。
+- 仓库内的源码文件保存为 UTF-8；`BGT_SOURCE_ENCODING` 决定的是**运行期**窄字符串
+  的编码（也就是学生源码的编码），不是仓库文件的编码。
+- 默认 `BGT_SOURCE_ENCODING=UTF-8`：MSVC 用 `/utf-8`，行为与历次版本一致。
+- `BGT_SOURCE_ENCODING=GBK`：消费端用 `/source-charset:utf-8 /execution-charset:.936`
+  （GCC / Clang 为 `-finput-charset=UTF-8 -fexec-charset=GBK`），libbgt 在 SDL 边界
+  做 GBK 与 UTF-8 的双向转换。
+- 字符集选项必须按目标下发：MSVC 的 `/utf-8` 与 `/execution-charset:<代码页>` 互斥
+  （D8016），因此不能再用顶层 `add_compile_options`。
+- GBK 模式的学生包附带 GBK 版头文件（自带构建模式声明，学生工程无需配置字符集
+  选项），并带编译期与链接期的编码一致性检查。详见[编码支持](encoding.md)。
 
 ## 9. SDL3 封装原则
 
@@ -312,7 +321,7 @@ unsigned bgt_rgba(int r, int g, int b, int a);
 - 字体文件加载。
 - 字体大小管理。
 - 字体缓存。
-- UTF-8 文本渲染。
+- UTF-8 文本渲染（库内部始终把 UTF-8 交给 SDL3_ttf，源码编码由转换层负责）。
 - 文本尺寸测量。
 
 基础 API 不暴露：
@@ -342,11 +351,12 @@ git submodule update --init --recursive
 CMake 设计要求：
 
 - 根项目提供 `CMakeLists.txt`。
-- 使用 `add_subdirectory(third_party/SDL)`。
-- 使用 `add_subdirectory(third_party/SDL_ttf)`。
+- 使用 `add_subdirectory(third_party)` 引入 4 个 vendored 依赖；该目录独占一个目录
+  作用域，使 MSVC 的 `/utf-8` 只作用于 vendored 源码。
 - 构建静态库或共享库由 CMake 选项控制。
 - 示例程序通过 CMake 统一构建。
-- MSVC 构建时自动启用 `/utf-8`。
+- 项目自身的目标按目标下发字符集：UTF-8 模式为 `/utf-8`，GBK 模式为
+  `/source-charset:utf-8 /execution-charset:.936`。
 - 构建后把示例运行所需的附加文件复制到示例输出目录。
 
 建议 CMake 选项：
@@ -356,6 +366,7 @@ BGT_BUILD_EXAMPLES
 BGT_BUILD_TESTS
 BGT_BUILD_SHARED
 BGT_USE_SYSTEM_SDL
+BGT_SOURCE_ENCODING
 ```
 
 默认推荐：
