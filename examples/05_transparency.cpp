@@ -1,3 +1,11 @@
+/**
+ * @file 05_transparency.cpp
+ * @brief libbgt 半透明示例：`bgt_rgba()` 的 alpha 叠加效果。
+ * @details 先用匿名命名空间里的 `draw_checkerboard()` 画灰白棋盘格做底，
+ *          再叠加多个不同透明度的圆、矩形、三角形，直观看清 a=0 到
+ *          a=255 的差别。
+ */
+
 #include "bgt.h"
 
 // NOLINTBEGIN(readability-magic-numbers)

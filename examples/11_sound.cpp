@@ -1,13 +1,18 @@
-// =====================================================================
-// libbgt 声音播放 API 演示（v0.3）
-// 每个板块演示声音的一组能力，按【空格】进入下一板块，随时可以按
-// 【Esc】退出。示例用到的 11_*.wav 都是用代码合成的（生成脚本
-// make_sound_assets.py），程序开始时把音效加载好，存进 int 变量。
-//   板块 1  音效 —— 按 1/2/3 触发，连按可以听到多声重叠
-//   板块 2  音量台 —— 方向键分别调音效和音乐的音量
-//   板块 3  背景音乐 —— 起播、停止、播放中自动切歌
-//   板块 4  错误处理 —— 播放不存在的文件，把错误画出来
-// =====================================================================
+/**
+ * @file 11_sound.cpp
+ * @brief libbgt 声音播放 API 演示（v0.3）。
+ * @details 每个板块演示声音的一组能力，按【空格】进入下一板块，随时
+ *          可以按【Esc】退出。示例用到的 11_*.wav 都是用代码合成的
+ *          （生成脚本 make_sound_assets.py），程序开始时把音效加载好，
+ *          存进 int 变量。
+ *
+ * 板块划分：
+ *   板块 1  音效 —— 按 1/2/3 触发，连按可以听到多声重叠
+ *   板块 2  音量台 —— 方向键分别调音效和音乐的音量
+ *   板块 3  背景音乐 —— 起播、停止、播放中自动切歌
+ *   板块 4  错误处理 —— 播放不存在的文件，把错误画出来
+ */
+
 // NOLINTBEGIN(readability-magic-numbers, readability-identifier-length,
 // readability-function-cognitive-complexity)
 
@@ -26,7 +31,7 @@ int main()
     }
     bgt_set_background(BGT_WHITE);
 
-    // ---------- 程序开头把音效都加载好，存进 int 变量 ----------
+    /// ---------- 程序开头把音效都加载好，存进 int 变量 ----------
     const int jump = bgt_load_sound("11_jump.wav");
     const int ding = bgt_load_sound("11_ding.wav");
     const int boom = bgt_load_sound("11_boom.wav");
@@ -34,22 +39,22 @@ int main()
         bgt_print_error();
     }
 
-    int part = 1; // 当前板块号：1 到 4
+    int part = 1; ///< 当前板块号：1 到 4
 
-    // 板块 1：音效触发计数
+    /// 板块 1：音效触发计数
     int jump_count = 0;
     int ding_count = 0;
     int boom_count = 0;
 
-    // 板块 2：音量（0-100）
+    /// 板块 2：音量（0-100）
     int sound_volume = 100;
     int music_volume = 100;
 
-    // 板块 3：音乐状态提示
+    /// 板块 3：音乐状态提示
     bool music_started = false;
 
     while (bgt_window_is_open()) {
-        // ---------- 板块 1：音效 ----------
+        /// ---------- 板块 1：音效 ----------
         if (part == 1) {
             bgt_set_window_title("libbgt 声音演示 - 板块 1：音效");
             if (bgt_key_just_pressed(BGT_KEY_1)) {
@@ -80,7 +85,7 @@ int main()
                           "——这就是音效的“重叠”。", 22);
         }
 
-        // ---------- 板块 2：音量台 ----------
+        /// ---------- 板块 2：音量台 ----------
         if (part == 2) {
             bgt_set_window_title("libbgt 声音演示 - 板块 2：音量台");
             if (bgt_key_just_pressed(BGT_KEY_UP) && sound_volume < 100) {
@@ -104,11 +109,11 @@ int main()
                 bgt_set_music_volume(music_volume);
             }
             if (bgt_key_just_pressed(BGT_KEY_1)) {
-                bgt_play_sound(jump); // 试听当前音效音量
+                bgt_play_sound(jump); ///< 试听当前音效音量
             }
             bgt_set_color(BGT_BLACK);
             bgt_draw_text(40, 36, "板块 2：音量台 —— 方向键调节 0-100", 32);
-            // 两条音量条：宽度和数值成比例
+            /// 两条音量条：宽度和数值成比例
             bgt_draw_text(80, 160, "音效音量（↑↓ 调节，按 1 试听）", 22);
             bgt_set_color(BGT_BLUE);
             bgt_fill_rect(80, 200, sound_volume * 6, 30);
@@ -131,7 +136,7 @@ int main()
                           "自动收到边界，所以怎么按都不会出错）。", 22);
         }
 
-        // ---------- 板块 3：背景音乐 ----------
+        /// ---------- 板块 3：背景音乐 ----------
         if (part == 3) {
             bgt_set_window_title("libbgt 声音演示 - 板块 3：背景音乐");
             if (bgt_key_just_pressed(BGT_KEY_P)) {
@@ -165,7 +170,7 @@ int main()
             bgt_draw_text(80, 460, "放一整首很长的曲子也不会占很多内存。", 22);
         }
 
-        // ---------- 板块 4：错误处理 ----------
+        /// ---------- 板块 4：错误处理 ----------
         if (part == 4) {
             bgt_set_window_title("libbgt 声音演示 - 板块 4：错误处理");
             if (bgt_key_just_pressed(BGT_KEY_E)) {
@@ -187,7 +192,7 @@ int main()
                           "bgt_draw_error 能把它画在窗口里，方便调试。", 22);
         }
 
-        // 底部统一提示
+        /// 底部统一提示
         bgt_set_color(BGT_DARK_GRAY);
         if (part < 4) {
             bgt_draw_text(40, 648,
@@ -198,7 +203,7 @@ int main()
                           " —— 声音随窗口一起清理", 24);
         }
 
-        // 每个板块都支持按空格进入下一板块；最后一个板块按空格关闭
+        /// 每个板块都支持按空格进入下一板块；最后一个板块按空格关闭
         if (bgt_key_just_pressed(BGT_KEY_SPACE)) {
             if (part < 4) {
                 part = part + 1;

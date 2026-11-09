@@ -1,7 +1,13 @@
+/**
+ * @file bgt_encoding.cpp
+ * @brief libbgt 内部编码转换层的实现。
+ * @details GBK 源编码目前只在 Windows 上实现（WinAPI）。在其他平台上启用
+ *          GBK 模式属于配置错误：CMake 会先报错，这里再兜一道，避免静默
+ *          产生乱码。
+ */
+
 #include "bgt_encoding.h"
 
-// GBK 源编码目前只在 Windows 上实现（WinAPI）。在其他平台上启用 GBK 模式属于
-// 配置错误：CMake 会先报错，这里再兜一道，避免静默产生乱码。
 #if !defined(_WIN32) && BGT_SOURCE_ENCODING == BGT_ENCODING_GBK
 #error "GBK source encoding is implemented on Windows only; an iconv backend is reserved in src/bgt_encoding.cpp"
 #endif
@@ -22,8 +28,15 @@
 namespace bgt {
 namespace {
 
-// 源编码下单个字符占用的字节数。UTF-8 按首字节判断宽度；GBK 的首字节在
-// 0x81-0xFE 之间表示双字节字符。非法字节按单字节处理，不会越界。
+/**
+ * @brief 求源编码下单个字符占用的字节数。
+ *
+ * UTF-8 按首字节判断宽度；GBK 的首字节在 0x81-0xFE 之间表示双字节字符。
+ * 非法字节按单字节处理，不会越界。
+ *
+ * @param byte 字符的首字节。
+ * @return 该字符占用的字节数（1-4）。
+ */
 constexpr std::size_t encoded_char_bytes(unsigned char byte)
 {
     if constexpr (kSourceEncoding == Encoding::Utf8) {
@@ -38,21 +51,38 @@ constexpr std::size_t encoded_char_bytes(unsigned char byte)
         }
         return 1;
     } else {
-        // GBK 尾字节范围 0x40-0xFE，因此 ASCII（< 0x40）永远不会被当作尾字节，
-        // 但尾字节可能是 [ ] # 等符号——这正是不能用 find() 直接搜索的原因。
+        /// GBK 尾字节范围 0x40-0xFE，因此 ASCII（< 0x40）永远不会被当作
+        /// 尾字节，但尾字节可能是 [ ] # 等符号——这正是不能用 find() 直接
+        /// 搜索的原因。
         return (byte >= 0x81U && byte <= 0xFEU) ? 2 : 1;
     }
 }
 
 #if defined(_WIN32)
 
+/**
+ * @brief 把 `bgt::Encoding` 映射成 Windows 代码页。
+ *
+ * @param encoding 编码名。
+ * @return 对应的 `CP_*` 代码页常量。
+ */
 constexpr UINT code_page_of(Encoding encoding)
 {
-    // 936 = GBK（Windows 简体中文 ANSI 代码页）。
+    /// 936 = GBK（Windows 简体中文 ANSI 代码页）。
     return encoding == Encoding::Utf8 ? CP_UTF8 : 936U;
 }
 
-// 多字节 -> UTF-16。strict 时拒绝非法字节序列。失败时 out 保持不变。
+/**
+ * @brief 多字节 -> UTF-16。
+ *
+ * strict 时拒绝非法字节序列。失败时 `out` 保持不变。
+ *
+ * @param text 输入的多字节字符串。
+ * @param from 输入字符串的编码。
+ * @param strict 是否严格校验非法字节序列。
+ * @param[out] out 成功时写入转换结果；失败时保持不变。
+ * @return 成功返回 true；失败返回 false。
+ */
 bool widen(const std::string &text, Encoding from, bool strict,
            std::wstring &out)
 {
@@ -80,8 +110,18 @@ bool widen(const std::string &text, Encoding from, bool strict,
     return true;
 }
 
-// UTF-16 -> 多字节。strict 时要求每个字符都能精确表示（不出现默认替换字符、
-// 也不接受“最佳拟合”）。失败时 out 保持不变。
+/**
+ * @brief UTF-16 -> 多字节。
+ *
+ * strict 时要求每个字符都能精确表示（不出现默认替换字符、也不接受“最佳
+ * 拟合”）。失败时 `out` 保持不变。
+ *
+ * @param text 输入的 UTF-16 字符串。
+ * @param to 目标编码。
+ * @param strict 是否严格校验每个字符都能精确表示。
+ * @param[out] out 成功时写入转换结果；失败时保持不变。
+ * @return 成功返回 true；失败返回 false。
+ */
 bool narrow(const std::wstring &text, Encoding to, bool strict,
             std::string &out)
 {
@@ -96,8 +136,9 @@ bool narrow(const std::wstring &text, Encoding to, bool strict,
     if (strict && to == Encoding::Utf8) {
         flags = WC_ERR_INVALID_CHARS;
     } else if (check_default) {
-        // 关掉 Windows 的“最佳拟合”：否则 U+00B2 会被静默换成 '2'（used_default
-        // 仍为 FALSE），严格转换就漏掉了这种悄悄改字的情况。
+        /// 关掉 Windows 的“最佳拟合”：否则 U+00B2 会被静默换成 '2'
+        /// （used_default 仍为 FALSE），严格转换就漏掉了这种悄悄改字的
+        /// 情况。
         flags = WC_NO_BEST_FIT_CHARS;
     }
     BOOL used_default = FALSE;
@@ -122,8 +163,18 @@ bool narrow(const std::wstring &text, Encoding to, bool strict,
     return true;
 }
 
-#endif // defined(_WIN32)
+#endif ///< defined(_WIN32)
 
+/**
+ * @brief 编码转换的公共实现：先转 UTF-16，再转到目标编码。
+ *
+ * @param text 待转换的字符串。
+ * @param from 输入编码。
+ * @param to 目标编码。
+ * @param strict 是否启用严格校验。
+ * @param[out] out 成功时写入转换结果。
+ * @return 成功返回 true；失败返回 false。
+ */
 bool convert_into(const std::string &text, Encoding from, Encoding to,
                   bool strict, std::string &out)
 {
@@ -150,7 +201,8 @@ std::string convert(const std::string &text, Encoding from, Encoding to)
 {
     std::string out;
     if (!convert_into(text, from, to, false, out)) {
-        // 没有后端或输入无法解析时保持原样：宁可显示为乱码，也不要丢数据。
+        /// 没有后端或输入无法解析时保持原样：宁可显示为乱码，也不要丢
+        /// 数据。
         return text;
     }
     return out;
@@ -201,7 +253,7 @@ std::filesystem::path to_native_path(const std::string &text)
     }
     return std::filesystem::path(wide);
 #else
-    // 非 Windows 的文件系统接口直接用本机编码（UTF-8）解释窄路径。
+    /// 非 Windows 的文件系统接口直接用本机编码（UTF-8）解释窄路径。
     return std::filesystem::path(text);
 #endif
 }
@@ -244,7 +296,7 @@ bool encoded_ends_with_ascii(const std::string &text, char ascii)
         const std::size_t char_bytes =
             encoded_char_bytes(static_cast<unsigned char>(text[index]));
         if (index + char_bytes > text.size()) {
-            // 末尾是残缺的多字节字符：它不是任何一个完整字符。
+            /// 末尾是残缺的多字节字符：它不是任何一个完整字符。
             return false;
         }
         last_start = index;

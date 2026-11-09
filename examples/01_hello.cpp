@@ -1,3 +1,11 @@
+/**
+ * @file 01_hello.cpp
+ * @brief libbgt 的第一个示例：在窗口中央画一个蓝色圆和一行中文。
+ * @details 演示一个最小可运行程序的结构：打开窗口、设置帧率上限和
+ *          背景色，然后在主循环里画图并调用 `bgt_update_window()` 显示，
+ *          循环结束后关闭窗口。所有常量都用 `constexpr int` 声明。
+ */
+
 #include "bgt.h"
 
 int main()

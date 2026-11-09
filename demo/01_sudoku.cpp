@@ -1,3 +1,10 @@
+/**
+ * @file 01_sudoku.cpp
+ * @brief 数独演示：鼠标选格，键盘或按钮填数，支持填数与候选标记两种模式。
+ * @details 谜题优先读取可执行文件旁的 `01_sudoku_puzzle.txt`；读取失败时回退
+ *          到内置备用题目。
+ */
+
 #include "bgt.h"
 
 #include <array>

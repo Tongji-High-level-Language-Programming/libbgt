@@ -282,6 +282,14 @@ package-gbk/
 - [v0.2 API 文档（图片、随机数、碰撞检测）](docs/api-v0.2.md)
 - [v0.3 API 文档（文件存档、声音播放、错误诊断）](docs/api-v0.3.md)
 
+API 参考由 Doxygen 直接从源码注释生成（仓库内注释统一使用 Doxygen 格式）：
+
+```bash
+doxygen Doxyfile
+```
+
+生成结果在 `docs/doxygen/html/index.html`，需要本机安装 Doxygen（1.9 或更新版本）。
+
 ## 首版范围
 
 首版 `v0.1` 目标是提供：

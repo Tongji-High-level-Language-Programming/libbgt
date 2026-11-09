@@ -1,16 +1,18 @@
-// =====================================================================
-// libbgt 碰撞检测 API 演示（v0.2）
-//
-// 每个板块介绍一对形状的命中判断，按【空格】进入下一板块，随时可以按
-// 【Esc】退出。bgt_hit_* 是纯几何函数，不开窗口也能用：形状×形状必须
-// 实际重叠才算命中（恰好相切不算），点测的命中范围与画出的像素一致。
-//
-//   板块 1  点与矩形 —— 鼠标"悬停按钮"
-//   板块 2  点与圆 —— 鼠标"打靶"
-//   板块 3  矩形与矩形 —— 方向键推方块撞挡板
-//   板块 4  圆与圆 —— 相切不算碰（重点教学）
-//   板块 5  圆与矩形 —— "球拍"原型
-// =====================================================================
+/**
+ * @file 09_collision.cpp
+ * @brief libbgt 碰撞检测 API 演示（v0.2）。
+ * @details 每个板块介绍一对形状的命中判断，按【空格】进入下一板块，
+ *          随时可以按【Esc】退出。`bgt_hit_*` 是纯几何函数，不开窗口
+ *          也能用：形状×形状必须实际重叠才算命中（恰好相切不算），点测
+ *          的命中范围与画出的像素一致。
+ *
+ * 板块划分：
+ *   板块 1  点与矩形 —— 鼠标"悬停按钮"
+ *   板块 2  点与圆 —— 鼠标"打靶"
+ *   板块 3  矩形与矩形 —— 方向键推方块撞挡板
+ *   板块 4  圆与圆 —— 相切不算碰（重点教学）
+ *   板块 5  圆与矩形 —— "球拍"原型
+ */
 
 #include "bgt.h"
 
@@ -21,7 +23,7 @@
 
 int main()
 {
-    // ---------- 常量 ----------
+    /// ---------- 常量 ----------
     const int window_width = 1000;
     const int window_height = 700;
     const int target_fps = 60;
@@ -32,17 +34,17 @@ int main()
     }
     bgt_set_fps_limit(target_fps);
 
-    // ---------- 各板块需要的"跨帧状态"（就是普通变量）----------
+    /// ---------- 各板块需要的"跨帧状态"（就是普通变量）----------
 
-    int part = 1; // 当前板块号：1 到 5
+    int part = 1; ///< 当前板块号：1 到 5
 
-    // 板块 1：按钮矩形
+    /// 板块 1：按钮矩形
     const int button_x = 350;
     const int button_y = 300;
     const int button_w = 300;
     const int button_h = 90;
 
-    // 板块 2：靶圆与点击计数
+    /// 板块 2：靶圆与点击计数
     const int target_x = 500;
     const int target_y = 430;
     const int target_r = 60;
@@ -52,7 +54,7 @@ int main()
     int last_click_x = -1;
     int last_click_y = -1;
 
-    // 板块 3：方向键控制的方块 vs 固定挡板
+    /// 板块 3：方向键控制的方块 vs 固定挡板
     int player_x = 60;
     int player_y = 320;
     const int player_w = 80;
@@ -62,8 +64,8 @@ int main()
     const int wall_w = 200;
     const int wall_h = 150;
 
-    // 板块 4：方向键控制的圆 vs 固定圆
-    // （起始位置保证"恰好相切"的位置 (500, 280) 用方向键可达）
+    /// 板块 4：方向键控制的圆 vs 固定圆
+    /// （起始位置保证"恰好相切"的位置 (500, 280) 用方向键可达）
     int ball_x = 500;
     int ball_y = 240;
     const int ball_r = 40;
@@ -71,7 +73,7 @@ int main()
     const int ring_y = 400;
     const int ring_r = 80;
 
-    // 板块 5：方向键控制的圆 vs 挡板矩形
+    /// 板块 5：方向键控制的圆 vs 挡板矩形
     int puck_x = 120;
     int puck_y = 400;
     const int puck_r = 40;
@@ -80,16 +82,16 @@ int main()
     const int paddle_w = 240;
     const int paddle_h = 160;
 
-    // ---------- 主循环 ----------
+    /// ---------- 主循环 ----------
     while (bgt_window_is_open()) {
 
-        // 随时退出
+        /// 随时退出
         if (bgt_key_just_pressed(BGT_KEY_ESCAPE)) {
             bgt_close_window();
             break;
         }
 
-        // 方向键移动量（板块 3~5 通用）
+        /// 方向键移动量（板块 3~5 通用）
         int move_x = 0;
         int move_y = 0;
         if (bgt_key_is_down(BGT_KEY_LEFT)) {
@@ -106,9 +108,9 @@ int main()
         }
 
         if (part == 1) {
-            // =====================================================
-            // 板块 1：点与矩形 —— 鼠标"悬停按钮"
-            // =====================================================
+            /// =====================================================
+            /// 板块 1：点与矩形 —— 鼠标"悬停按钮"
+            /// =====================================================
             bgt_set_background(bgt_rgb(250, 250, 250));
             bgt_set_window_title("libbgt 碰撞检测演示 - 板块 1：点与矩形");
 
@@ -133,7 +135,7 @@ int main()
                           "“点按钮”判断。",
                           20);
 
-            // 按钮：指针在按钮里时高亮
+            /// 按钮：指针在按钮里时高亮
             if (hover) {
                 bgt_set_color(BGT_ORANGE);
             }
@@ -151,7 +153,7 @@ int main()
             }
             bgt_draw_text(button_x + 78, button_y + 28, "我 是 按 钮", 28);
 
-            // 鼠标十字线
+            /// 鼠标十字线
             bgt_set_color(BGT_BLUE);
             bgt_draw_line(mouse_x - 10, mouse_y, mouse_x + 10, mouse_y);
             bgt_draw_line(mouse_x, mouse_y - 10, mouse_x, mouse_y + 10);
@@ -171,16 +173,16 @@ int main()
             bgt_draw_text(40, 450, hover_text, 20);
         }
         else if (part == 2) {
-            // =====================================================
-            // 板块 2：点与圆 —— 鼠标"打靶"
-            // =====================================================
+            /// =====================================================
+            /// 板块 2：点与圆 —— 鼠标"打靶"
+            /// =====================================================
             bgt_set_background(bgt_rgb(250, 250, 250));
             bgt_set_window_title("libbgt 碰撞检测演示 - 板块 2：点与圆");
 
             const int mouse_x = bgt_mouse_x();
             const int mouse_y = bgt_mouse_y();
 
-            // 左键：判断这一次点击是否命中靶圆
+            /// 左键：判断这一次点击是否命中靶圆
             if (bgt_mouse_just_pressed(BGT_MOUSE_LEFT)) {
                 click_count = click_count + 1;
                 last_click_x = mouse_x;
@@ -205,7 +207,7 @@ int main()
                           20);
             bgt_draw_text(40, 162, "用鼠标左键点击靶子试试。", 20);
 
-            // 靶子：三环靶
+            /// 靶子：三环靶
             bgt_set_color(BGT_RED);
             bgt_fill_circle(target_x, target_y, target_r);
             bgt_set_color(BGT_WHITE);
@@ -213,7 +215,7 @@ int main()
             bgt_set_color(BGT_RED);
             bgt_fill_circle(target_x, target_y, target_r / 5);
 
-            // 最近一次点击位置画小叉
+            /// 最近一次点击位置画小叉
             if (last_click_x >= 0) {
                 bgt_set_color(BGT_BLACK);
                 bgt_draw_line(last_click_x - 8, last_click_y - 8,
@@ -222,7 +224,7 @@ int main()
                               last_click_x + 8, last_click_y - 8);
             }
 
-            // 鼠标十字线
+            /// 鼠标十字线
             bgt_set_color(BGT_BLUE);
             bgt_draw_line(mouse_x - 10, mouse_y, mouse_x + 10, mouse_y);
             bgt_draw_line(mouse_x, mouse_y - 10, mouse_x, mouse_y + 10);
@@ -246,9 +248,9 @@ int main()
             bgt_draw_text(40, 450, score_text, 20);
         }
         else if (part == 3) {
-            // =====================================================
-            // 板块 3：矩形与矩形 —— 方向键推方块撞挡板
-            // =====================================================
+            /// =====================================================
+            /// 板块 3：矩形与矩形 —— 方向键推方块撞挡板
+            /// =====================================================
             bgt_set_background(bgt_rgb(250, 250, 250));
             bgt_set_window_title("libbgt 碰撞检测演示 - 板块 3：矩形与矩形");
 
@@ -282,13 +284,13 @@ int main()
                           20);
             bgt_draw_text(40, 162, "方向键移动绿色方块，撞上灰色挡板。", 20);
 
-            // 固定挡板
+            /// 固定挡板
             bgt_set_color(BGT_DARK_GRAY);
             bgt_fill_rect(wall_x, wall_y, wall_w, wall_h);
             bgt_set_color(BGT_BLACK);
             bgt_draw_rect(wall_x, wall_y, wall_w, wall_h);
 
-            // 玩家方块：命中变红
+            /// 玩家方块：命中变红
             if (hit) {
                 bgt_set_color(BGT_RED);
             }
@@ -314,9 +316,9 @@ int main()
             bgt_draw_text(40, 596, hit_text, 20);
         }
         else if (part == 4) {
-            // =====================================================
-            // 板块 4：圆与圆 —— 相切不算碰（重点教学）
-            // =====================================================
+            /// =====================================================
+            /// 板块 4：圆与圆 —— 相切不算碰（重点教学）
+            /// =====================================================
             bgt_set_background(bgt_rgb(250, 250, 250));
             bgt_set_window_title("libbgt 碰撞检测演示 - 板块 4：圆与圆");
 
@@ -356,13 +358,13 @@ int main()
                           "返回的仍是不碰！",
                           20);
 
-            // 固定大圆
+            /// 固定大圆
             bgt_set_color(BGT_DARK_GRAY);
             bgt_fill_circle(ring_x, ring_y, ring_r);
             bgt_set_color(BGT_BLACK);
             bgt_draw_circle(ring_x, ring_y, ring_r);
 
-            // 玩家圆：命中变红
+            /// 玩家圆：命中变红
             if (hit) {
                 bgt_set_color(BGT_RED);
             }
@@ -396,9 +398,9 @@ int main()
             bgt_draw_text(40, 596, dist_text, 20);
         }
         else {
-            // =====================================================
-            // 板块 5：圆与矩形 —— "球拍"原型
-            // =====================================================
+            /// =====================================================
+            /// 板块 5：圆与矩形 —— "球拍"原型
+            /// =====================================================
             bgt_set_background(bgt_rgb(250, 250, 250));
             bgt_set_window_title("libbgt 碰撞检测演示 - 板块 5：圆与矩形");
 
@@ -435,13 +437,13 @@ int main()
                           "这就是球类游戏里“球撞挡板”的判断原型（Pong）。",
                           20);
 
-            // 挡板
+            /// 挡板
             bgt_set_color(BGT_DARK_GRAY);
             bgt_fill_rect(paddle_x, paddle_y, paddle_w, paddle_h);
             bgt_set_color(BGT_BLACK);
             bgt_draw_rect(paddle_x, paddle_y, paddle_w, paddle_h);
 
-            // 玩家圆：命中变红；圆心画小黑点，帮助学生看见"圆心进入矩形"
+            /// 玩家圆：命中变红；圆心画小黑点，帮助学生看见"圆心进入矩形"
             if (hit) {
                 bgt_set_color(BGT_RED);
             }
@@ -468,14 +470,14 @@ int main()
             bgt_draw_text(40, 596, puck_text, 20);
         }
 
-        // 底部统一提示（最后一个板块不再显示"下一板块"）
+        /// 底部统一提示（最后一个板块不再显示"下一板块"）
         if (part < 5) {
             bgt_set_color(BGT_DARK_GRAY);
             bgt_draw_text(40, 648, "按【空格】进入下一板块，按【Esc】退出程序",
                           18);
         }
 
-        // 每个板块都支持按空格进入下一板块；最后一个板块按空格关闭
+        /// 每个板块都支持按空格进入下一板块；最后一个板块按空格关闭
         if (bgt_key_just_pressed(BGT_KEY_SPACE)) {
             if (part == 5) {
                 break;

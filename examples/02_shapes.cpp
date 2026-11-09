@@ -1,3 +1,11 @@
+/**
+ * @file 02_shapes.cpp
+ * @brief libbgt 基本图形示例：点、线、矩形、圆、椭圆、三角形。
+ * @details 在一个固定窗口里分区演示每类图形：点阵、不同线宽的线条、
+ *          填充与描边的矩形、圆与椭圆、三角形。图形一律先
+ *          `bgt_set_color()` 设颜色再绘制，背景色用 `bgt_rgb()` 自定义。
+ */
+
 #include "bgt.h"
 
 // NOLINTBEGIN(readability-magic-numbers)
