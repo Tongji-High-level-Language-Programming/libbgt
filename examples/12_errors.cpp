@@ -65,8 +65,8 @@ int main()
                 y = y + 48;
             }
             bgt_set_color(BGT_DARK_GRAY);
-            bgt_draw_text(40, 650,
-                          "按【E】触发图片错误，按【F】触发字体错误。", 22);
+            bgt_draw_text(40, 650, "按【E】触发图片错误，按【F】触发字体错误。",
+                          22);
         }
 
         /// ---------- 板块 2：按序号查询 ----------
@@ -99,15 +99,16 @@ int main()
                 text_bytes = text_bytes + 1;
             }
             char taken[48] = {};
-            std::snprintf(taken, sizeof(taken),
-                          "文本已取进数组：共 %d 个字节", text_bytes);
+            std::snprintf(taken, sizeof(taken), "文本已取进数组：共 %d 个字节",
+                          text_bytes);
             bgt_draw_text(80, 260, taken, 22);
             /// 画长文本时让库按序号画：超宽自动换行，不用自己操心宽度。
             bgt_set_color(BGT_BLUE);
             bgt_draw_error(80, 300, 22, bgt_error_count() - 1);
             bgt_set_color(BGT_DARK_GRAY);
             bgt_draw_text(80, 420,
-                          "上面的统计来自板块 1 里按【E】/【F】触发的错误。", 22);
+                          "上面的统计来自板块 1 里按【E】/【F】触发的错误。",
+                          22);
         }
 
         /// ---------- 板块 3：单条呈现与换行 ----------
@@ -115,22 +116,19 @@ int main()
             bgt_set_window_title("libbgt 错误演示 - 板块 3：单条呈现");
             if (bgt_key_just_pressed(BGT_KEY_G)) {
                 /// 超长文件名触发一条超长消息，演示自动换行。
-                bgt_load_image(
-                    "一个特别特别特别特别特别长的文件名"
-                    "用来演示错误消息自动换行.png");
+                bgt_load_image("一个特别特别特别特别特别长的文件名"
+                               "用来演示错误消息自动换行.png");
             }
             bgt_set_color(BGT_BLACK);
             bgt_draw_text(40, 36, "板块 3：单条呈现 —— 长消息自动换行", 32);
-            bgt_draw_text(80, 130,
-                          "按【G】触发一条超长错误，再看下面：", 22);
+            bgt_draw_text(80, 130, "按【G】触发一条超长错误，再看下面：", 22);
             /// 无参版 bgt_draw_error 画的就是最新一条，超宽自动分行。
             bgt_set_color(BGT_RED);
             bgt_draw_error(80, 190, 24);
             bgt_set_color(BGT_DARK_GRAY);
-            bgt_draw_text(80, 420,
-                          "普通消息一行画完；超长消息按窗口宽度分行，", 22);
-            bgt_draw_text(80, 460,
-                          "不会再冲出屏幕右边界。", 22);
+            bgt_draw_text(80, 420, "普通消息一行画完；超长消息按窗口宽度分行，",
+                          22);
+            bgt_draw_text(80, 460, "不会再冲出屏幕右边界。", 22);
         }
 
         /// ---------- 板块 4：清空历史 ----------
@@ -142,32 +140,35 @@ int main()
             bgt_set_color(BGT_BLACK);
             bgt_draw_text(40, 36, "板块 4：清空历史 —— 从零开始", 32);
             char count_text[48] = {};
-            std::snprintf(count_text, sizeof(count_text),
-                          "当前错误条数：%d", bgt_error_count());
+            std::snprintf(count_text, sizeof(count_text), "当前错误条数：%d",
+                          bgt_error_count());
             bgt_draw_text(80, 200, count_text, 30);
             if (bgt_has_error()) {
                 bgt_draw_text(80, 280, "还有错误在历史里。", 26);
-            } else {
+            }
+            else {
                 bgt_draw_text(80, 280, "历史已经空了。", 26);
             }
             bgt_set_color(BGT_DARK_GRAY);
-            bgt_draw_text(80, 400,
-                          "按【C】清空；清空后 count 归零、has_error 变 false。",
-                          22);
+            bgt_draw_text(
+                80, 400, "按【C】清空；清空后 count 归零、has_error 变 false。",
+                22);
         }
 
         /// 底部统一提示
         bgt_set_color(BGT_DARK_GRAY);
         if (part < 4) {
             bgt_draw_text(40, 672, "按【空格】进入下一板块，按【Esc】退出", 22);
-        } else {
+        }
+        else {
             bgt_draw_text(40, 672, "按【Esc】退出程序", 22);
         }
 
         if (bgt_key_just_pressed(BGT_KEY_SPACE)) {
             if (part < 4) {
                 part = part + 1;
-            } else {
+            }
+            else {
                 break;
             }
         }

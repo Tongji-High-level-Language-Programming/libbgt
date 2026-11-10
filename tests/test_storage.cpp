@@ -27,13 +27,13 @@ int g_failed_checks = 0;
 /**
  * @brief 显式检查宏：失败时打印表达式与位置，任何构建配置下都生效。
  */
-#define BGT_CHECK(condition)                                            \
-    do {                                                                \
-        if (!(condition)) {                                             \
-            std::fprintf(stderr, "FAILED: %s (%s:%d)\n", #condition,    \
-                         __FILE__, __LINE__);                           \
-            g_failed_checks = g_failed_checks + 1;                      \
-        }                                                               \
+#define BGT_CHECK(condition)                                                   \
+    do {                                                                       \
+        if (!(condition)) {                                                    \
+            std::fprintf(stderr, "FAILED: %s (%s:%d)\n", #condition, __FILE__, \
+                         __LINE__);                                            \
+            g_failed_checks = g_failed_checks + 1;                             \
+        }                                                                      \
     } while (false)
 
 bool text_equals(const char *a, const char *b)
@@ -44,7 +44,8 @@ bool text_equals(const char *a, const char *b)
 /**
  * @brief 一节及其键值对（键、值都是落盘后的文本形式）。
  */
-using DumpSection = std::pair<std::string, std::vector<std::pair<std::string, std::string>>>;
+using DumpSection =
+    std::pair<std::string, std::vector<std::pair<std::string, std::string>>>;
 
 /**
  * @brief 校验存档文本等于现场排序后的期望内容。
@@ -177,15 +178,18 @@ int main()
     BGT_CHECK(bgt_has_error());
     bgt_clear_error();
 
-    /// 7) 截断：放不下时按字符边界截断（不会把汉字切一半）并记错；放得下则完整拷贝。
+    /// 7)
+    /// 截断：放不下时按字符边界截断（不会把汉字切一半）并记错；放得下则完整拷贝。
     ///    out_size 取得足够小，保证 UTF-8 与 GBK 下都只放得下 1 个汉字。
     bgt_set_string("截断", "long", "张三");
-    char small[4] = {}; ///< 只放得下 1 个汉字 + NUL（GBK 2 字节 / UTF-8 3 字节）
+    char small[4] =
+        {}; ///< 只放得下 1 个汉字 + NUL（GBK 2 字节 / UTF-8 3 字节）
     bgt_get_string("截断", "long", small, 4, "?");
     BGT_CHECK(text_equals(small, "张"));
     BGT_CHECK(bgt_has_error());
     bgt_clear_error();
-    char fits[8] = {}; ///< 两种编码下“张三”加 NUL 都放得进（GBK 5 字节 / UTF-8 7 字节）
+    char fits[8] =
+        {}; ///< 两种编码下“张三”加 NUL 都放得进（GBK 5 字节 / UTF-8 7 字节）
     bgt_get_string("截断", "long", fits, 8, "?");
     BGT_CHECK(text_equals(fits, "张三"));
     BGT_CHECK(!bgt_has_error());
@@ -203,7 +207,7 @@ int main()
     BGT_CHECK(bgt_load(k_test_file));
     BGT_CHECK(!bgt_has_error());
     BGT_CHECK(bgt_get_int("进度", "count", 0) == 0); ///< 表是空的
-    BGT_CHECK(bgt_save(k_test_file));               ///< 空表 → 0 字节文件
+    BGT_CHECK(bgt_save(k_test_file));                ///< 空表 → 0 字节文件
     {
         std::ifstream file(k_test_file, std::ios::binary);
         std::string content((std::istreambuf_iterator<char>(file)),
@@ -247,12 +251,12 @@ int main()
         std::ifstream file(k_test_file, std::ios::binary);
         std::string content((std::istreambuf_iterator<char>(file)),
                             std::istreambuf_iterator<char>());
-        check_sorted_dump("10) 写盘格式", content,
-                          {{"最高分", {{"best", "321"}}},
-                           {"进度", {{"time", "45.5"}}},
-                           {"玩家", {{"name", "李四"}, {"等式", "1+1=2"}}},
-                           {"极限",
-                            {{"max", "2147483647"}, {"min", "-2147483648"}}}});
+        check_sorted_dump(
+            "10) 写盘格式", content,
+            {{"最高分", {{"best", "321"}}},
+             {"进度", {{"time", "45.5"}}},
+             {"玩家", {{"name", "李四"}, {"等式", "1+1=2"}}},
+             {"极限", {{"max", "2147483647"}, {"min", "-2147483648"}}}});
     }
 
     /// 11) load 的整表替换：读入后，之前只在内存里的键消失。
@@ -281,7 +285,8 @@ int main()
     bgt_get_string("bom", "muted", bom_muted, 8, "?");
     BGT_CHECK(text_equals(bom_muted, "true"));
 
-    /// 12b) 不带 BOM 的手写文件用源码编码书写，中文节名、注释、`\r\n` 行尾都照常读入。
+    /// 12b) 不带 BOM 的手写文件用源码编码书写，中文节名、注释、`\r\n`
+    /// 行尾都照常读入。
     {
         std::ofstream file(k_test_file, std::ios::binary | std::ios::trunc);
         file << "# 用记事本写的存档\r\n";
@@ -303,7 +308,7 @@ int main()
     ///     （不会悄悄归进前一个节）。
     {
         std::ofstream file(k_test_file, std::ios::binary | std::ios::trunc);
-        file << "孤儿=1\n";   ///< 节头之前 → 坏行
+        file << "孤儿=1\n"; ///< 节头之前 → 坏行
         file << "[好节]\n";
         file << "ok=42\n";
         file << "没有等号的行\n"; ///< → 坏行
@@ -326,7 +331,7 @@ int main()
         file << "[节二]\n";
         file << "b=2\n";
         file << "[节一]\n"; ///< 重复节头 = 同一节继续
-        file << "a=9\n";   ///< 重复键后者覆盖
+        file << "a=9\n";    ///< 重复键后者覆盖
         file << "[空节]\n";
     }
     bgt_clear_error();
@@ -338,10 +343,9 @@ int main()
         std::ifstream file(k_test_file, std::ios::binary);
         std::string content((std::istreambuf_iterator<char>(file)),
                             std::istreambuf_iterator<char>());
-        check_sorted_dump("14) 重复节头与空节往返", content,
-                          {{"节一", {{"a", "9"}}},
-                           {"节二", {{"b", "2"}}},
-                           {"空节", {}}});
+        check_sorted_dump(
+            "14) 重复节头与空节往返", content,
+            {{"节一", {{"a", "9"}}}, {"节二", {{"b", "2"}}}, {"空节", {}}});
     }
 
     /// 15) 超范围整数文本：按 int 读 → 默认值 + 记错；按 double 读得动。

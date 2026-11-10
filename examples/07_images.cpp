@@ -64,8 +64,8 @@ int main()
     double bounce_t = 0.0;
 
     /// 板块 8（错误）使用
-    bool error_printed = false;       ///< bgt_print_error 只打印一次
-    bool tried_bad_load = false;     ///< 板块 8：只尝试一次加载不存在的文件
+    bool error_printed = false;  ///< bgt_print_error 只打印一次
+    bool tried_bad_load = false; ///< 板块 8：只尝试一次加载不存在的文件
 
     /// ---------- 主循环 ----------
     while (bgt_window_is_open()) {
@@ -436,30 +436,31 @@ int main()
             /// tried_bad_load 保证后续帧不再重复发起文件 IO）
             if (!tried_bad_load) {
                 tried_bad_load = true;
-                const int bad =
-                    bgt_load_image("this_file_does_not_exist.png");
+                const int bad = bgt_load_image("this_file_does_not_exist.png");
 
                 if (bad == BGT_IMAGE_NONE) {
-                bgt_set_color(BGT_RED);
-                bgt_draw_text(
-                    40, 150, "加载不存在的文件 → 返回 BGT_IMAGE_NONE(0)：", 20);
-                bgt_draw_text(40, 190, "错误码可通过 bgt_error_code() 查看：",
-                              18);
-                char code_text[64];
-                std::snprintf(code_text, sizeof(code_text),
-                              "  bgt_error_code() = %d（BGT_ERROR_IMAGE）",
-                              bgt_error_code());
-                bgt_draw_text(60, 220, code_text, 18);
+                    bgt_set_color(BGT_RED);
+                    bgt_draw_text(40, 150,
+                                  "加载不存在的文件 → 返回 BGT_IMAGE_NONE(0)：",
+                                  20);
+                    bgt_draw_text(40, 190,
+                                  "错误码可通过 bgt_error_code() 查看：", 18);
+                    char code_text[64];
+                    std::snprintf(code_text, sizeof(code_text),
+                                  "  bgt_error_code() = %d（BGT_ERROR_IMAGE）",
+                                  bgt_error_code());
+                    bgt_draw_text(60, 220, code_text, 18);
 
-                /// 完整错误信息打印到控制台（首次进入本板块时）
-                if (!error_printed) {
-                    error_printed = true;
-                    bgt_print_error();
-                }
-                bgt_set_color(BGT_DARK_GRAY);
-                bgt_draw_text(
-                    40, 260,
-                    "完整错误信息已用 bgt_print_error() 打印到控制台。", 18);
+                    /// 完整错误信息打印到控制台（首次进入本板块时）
+                    if (!error_printed) {
+                        error_printed = true;
+                        bgt_print_error();
+                    }
+                    bgt_set_color(BGT_DARK_GRAY);
+                    bgt_draw_text(
+                        40, 260,
+                        "完整错误信息已用 bgt_print_error() 打印到控制台。",
+                        18);
                 }
             }
 

@@ -12,7 +12,8 @@
 #include <cstring>
 
 // NOLINTBEGIN(readability-magic-numbers, readability-identifier-length,
-// readability-function-cognitive-complexity, bugprone-easily-swappable-parameters)
+// readability-function-cognitive-complexity,
+// bugprone-easily-swappable-parameters)
 
 namespace {
 
@@ -23,23 +24,23 @@ constexpr int kTargetFps = 60;
 /// 棋盘与雷数可在此调整（改大需同时确认窗口放得下）
 constexpr int kGridSize = 9;
 constexpr int kMineCount = 10;
-constexpr int kCellCount = kGridSize * kGridSize;  ///< 81
+constexpr int kCellCount = kGridSize * kGridSize; ///< 81
 constexpr int kCellSize = 44;
 constexpr int kBoardX = 32;
 constexpr int kBoardY = 96;
-constexpr int kBoardPx = kGridSize * kCellSize;  ///< 396，棋盘底缘 492
-constexpr int kPanelX = 460;      ///< = 32 + 396 + 32
-constexpr int kPanelWidth = 216;  ///< 右缘 676，窗口余 24
+constexpr int kBoardPx = kGridSize * kCellSize; ///< 396，棋盘底缘 492
+constexpr int kPanelX = 460;                    ///< = 32 + 396 + 32
+constexpr int kPanelWidth = 216;                ///< 右缘 676，窗口余 24
 
 constexpr unsigned kColorBackground = 0xFFC0C6C0U; ///< bgt_rgb(192, 198, 192)
-constexpr unsigned kColorCovered = 0xFFD7DBD7U; ///< bgt_rgb(215, 219, 215)
+constexpr unsigned kColorCovered = 0xFFD7DBD7U;    ///< bgt_rgb(215, 219, 215)
 constexpr unsigned kColorCoveredBorder = 0xFF969C96U; ///< bgt_rgb(150,156,150)
 constexpr unsigned kColorRevealed = 0xFFEEEEEEU; ///< bgt_rgb(238, 238, 238)
-constexpr unsigned kColorPanel = 0xFFAAB2AAU; ///< bgt_rgb(170, 178, 170)
+constexpr unsigned kColorPanel = 0xFFAAB2AAU;    ///< bgt_rgb(170, 178, 170)
 
 /// 数字配色 1..8（经典扫雷）
-const unsigned kNumberColors[8] = {BGT_BLUE, BGT_GREEN, BGT_RED, BGT_PURPLE,
-                                   BGT_BROWN, BGT_CYAN, BGT_BLACK, BGT_GRAY};
+const unsigned kNumberColors[8] = {BGT_BLUE,  BGT_GREEN, BGT_RED,   BGT_PURPLE,
+                                   BGT_BROWN, BGT_CYAN,  BGT_BLACK, BGT_GRAY};
 
 /// 存档：节名与键名逐字
 /// [战绩] wins / best      —— best 存整数秒，0 表示无纪录
@@ -53,25 +54,25 @@ constexpr int kStateLost = 3;
 
 /// ---- 局面数据（不引入类、结构体和指针，全部用全局变量与数组）----
 
-int part;                     ///< 状态机，取值为 kState* 常量
+int part; ///< 状态机，取值为 kState* 常量
 bool cell_revealed[kCellCount];
 bool cell_flagged[kCellCount];
 bool cell_mine[kCellCount];
-int cell_number[kCellCount];  ///< 邻域雷数，布雷后计算
+int cell_number[kCellCount]; ///< 邻域雷数，布雷后计算
 bool mines_placed = false;
-int revealed_safe = 0;        ///< 已翻开的非雷格数
-int flags = 0;                ///< 当前插旗数
-int exploded_index = -1;      ///< 踩中的雷格下标（-1 无）
+int revealed_safe = 0;   ///< 已翻开的非雷格数
+int flags = 0;           ///< 当前插旗数
+int exploded_index = -1; ///< 踩中的雷格下标（-1 无）
 double start_time = 0.0;
-int elapsed_saved = 0;        ///< 续玩带入的已用秒数
+int elapsed_saved = 0; ///< 续玩带入的已用秒数
 int wins = 0;
-int best_time = 0;            ///< 0 = 无纪录
-int win_seconds = 0;          ///< 本局胜利用时
+int best_time = 0;   ///< 0 = 无纪录
+int win_seconds = 0; ///< 本局胜利用时
 bool new_best = false;
-bool has_resume = false;      ///< 启动检测到未完成局面
-char saved_board[128] = {};   ///< 启动读入的局面串（按 L 时解析）
+bool has_resume = false;    ///< 启动检测到未完成局面
+char saved_board[128] = {}; ///< 启动读入的局面串（按 L 时解析）
 char saved_mines[128] = {};
-int snd_mine = 0;             ///< bgt_load_sound 结果，0 = 没加载上
+int snd_mine = 0; ///< bgt_load_sound 结果，0 = 没加载上
 int snd_win = 0;
 
 /// ---- 辅助 ----
@@ -127,7 +128,7 @@ void compute_numbers()
             for (int dr = -1; dr <= 1; ++dr) {
                 for (int dc = -1; dc <= 1; ++dc) {
                     if (dr == 0 && dc == 0) {
-                        continue;  ///< 不算自己
+                        continue; ///< 不算自己
                     }
                     const int r = row + dr;
                     const int c = col + dc;
@@ -149,8 +150,8 @@ void place_mines(int row, int col)
     int n = 0;
     for (int r = 0; r < kGridSize; ++r) {
         for (int c = 0; c < kGridSize; ++c) {
-            const bool near_first = r >= row - 1 && r <= row + 1 &&
-                                    c >= col - 1 && c <= col + 1;
+            const bool near_first =
+                r >= row - 1 && r <= row + 1 && c >= col - 1 && c <= col + 1;
             if (!near_first) {
                 candidates[n] = cell_index(r, c);
                 n += 1;
@@ -161,7 +162,7 @@ void place_mines(int row, int col)
     /// 保证每个候选格等概率入雷；写死 72 时边线/角落首踩的尾部候选永远
     /// 不参与交换（采样有偏）。
     for (int i = 0; i < n - 1; ++i) {
-        const int j = bgt_random(i, n);  ///< 半开 [i, n)
+        const int j = bgt_random(i, n); ///< 半开 [i, n)
         const int tmp = candidates[i];
         candidates[i] = candidates[j];
         candidates[j] = tmp;
@@ -210,9 +211,11 @@ void build_board_string(char out[])
     for (int i = 0; i < kCellCount; ++i) {
         if (cell_revealed[i]) {
             out[i] = static_cast<char>('0' + cell_number[i]);
-        } else if (cell_flagged[i]) {
+        }
+        else if (cell_flagged[i]) {
             out[i] = 'F';
-        } else {
+        }
+        else {
             out[i] = '.';
         }
     }
@@ -243,7 +246,8 @@ void parse_board_string()
     for (int i = 0; i < kCellCount; ++i) {
         if (saved_board[i] == 'F') {
             cell_flagged[i] = true;
-        } else if (saved_board[i] >= '0' && saved_board[i] <= '8') {
+        }
+        else if (saved_board[i] >= '0' && saved_board[i] <= '8') {
             cell_revealed[i] = true;
             cell_number[i] = saved_board[i] - '0';
         }
@@ -258,7 +262,7 @@ void parse_board_string()
             flags += 1;
         }
         if (cell_revealed[i] && !cell_mine[i]) {
-            revealed_safe += 1;  ///< 只数非雷已翻格
+            revealed_safe += 1; ///< 只数非雷已翻格
         }
     }
     mines_placed = true;
@@ -280,7 +284,8 @@ void load_records()
         /// 先解析恢复到棋盘变量：提示屏要能画出存档局面
         parse_board_string();
         part = kStatePrompt;
-    } else {
+    }
+    else {
         fresh_game();
         part = kStatePlaying;
     }
@@ -300,11 +305,12 @@ void save_on_exit()
         bgt_set_string("局面", "board", board_str);
         bgt_set_string("局面", "mines", mines_str);
         bgt_set_int("局面", "time", elapsed_seconds());
-    } else {
+    }
+    else {
         /// 键保留但值清空，读回得空串自然判无
         bgt_set_string("局面", "board", "");
     }
-    bgt_save(kSaveFile);  ///< 返回值忽略——退出路径不弹错
+    bgt_save(kSaveFile); ///< 返回值忽略——退出路径不弹错
 }
 
 /// ---- 每帧输入（仅状态 1）----
@@ -325,7 +331,7 @@ void handle_left_click()
     const int row = (my - kBoardY) / kCellSize;
     const int idx = cell_index(row, col);
     if (cell_revealed[idx] || cell_flagged[idx]) {
-        return;  ///< 已翻或已插旗：左键无操作
+        return; ///< 已翻或已插旗：左键无操作
     }
     if (!mines_placed) {
         /// 首踩布雷：首格 3×3 已从候选排除，首格必 0，必连锁展开一片
@@ -369,12 +375,13 @@ void handle_right_click()
     const int row = (my - kBoardY) / kCellSize;
     const int idx = cell_index(row, col);
     if (cell_revealed[idx]) {
-        return;  ///< 已翻格右键无操作
+        return; ///< 已翻格右键无操作
     }
     if (cell_flagged[idx]) {
         cell_flagged[idx] = false;
         flags -= 1;
-    } else {
+    }
+    else {
         cell_flagged[idx] = true;
         flags += 1;
     }
@@ -410,11 +417,13 @@ void draw_board()
                     bgt_draw_text(x + (kCellSize - tw) / 2,
                                   y + (kCellSize - th) / 2, digit, 26);
                 }
-            } else {
+            }
+            else {
                 if (part == kStateLost && idx == exploded_index) {
-                    bgt_set_color(BGT_RED);  ///< 踩中的雷格：红底衬雷
+                    bgt_set_color(BGT_RED); ///< 踩中的雷格：红底衬雷
                     bgt_fill_rect(x, y, kCellSize, kCellSize);
-                } else {
+                }
+                else {
                     bgt_set_color(kColorCovered);
                     bgt_fill_rect(x, y, kCellSize, kCellSize);
                     bgt_set_color(kColorCoveredBorder);
@@ -422,15 +431,15 @@ void draw_board()
                 }
                 if (cell_flagged[idx]) {
                     bgt_set_color(BGT_BLACK);
-                    bgt_draw_line(x + 22, y + 10, x + 22, y + 32);  ///< 旗杆
+                    bgt_draw_line(x + 22, y + 10, x + 22, y + 32); ///< 旗杆
                     bgt_set_color(BGT_RED);
-                    bgt_fill_triangle(x + 22, y + 10, x + 22, y + 22,
-                                      x + 10, y + 16);  ///< 旗面
+                    bgt_fill_triangle(x + 22, y + 10, x + 22, y + 22, x + 10,
+                                      y + 16); ///< 旗面
                 }
             }
             if (part == kStateLost && cell_mine[idx]) {
                 bgt_set_color(BGT_BLACK);
-                bgt_fill_circle(x + 22, y + 22, 9);  ///< 雷体
+                bgt_fill_circle(x + 22, y + 22, 9); ///< 雷体
             }
         }
     }
@@ -453,7 +462,8 @@ void draw_panel()
     bgt_draw_text(text_x, 250, line, 24);
     if (best_time == 0) {
         bgt_draw_text(text_x, 290, "最快纪录：无", 24);
-    } else {
+    }
+    else {
         std::snprintf(line, sizeof(line), "最快纪录：%d 秒", best_time);
         bgt_draw_text(text_x, 290, line, 24);
     }
@@ -463,7 +473,8 @@ void draw_panel()
 
     if (part == kStatePlaying) {
         bgt_draw_text(text_x, 440, "左键翻格，右键插旗", 22);
-    } else if (part == kStateWon) {
+    }
+    else if (part == kStateWon) {
         bgt_set_color(BGT_GREEN);
         std::snprintf(line, sizeof(line), "胜利！用时 %d 秒", win_seconds);
         bgt_draw_text(text_x, 440, line, 22);
@@ -471,7 +482,8 @@ void draw_panel()
             bgt_set_color(BGT_RED);
             bgt_draw_text(text_x, 470, "新纪录！", 24);
         }
-    } else if (part == kStateLost) {
+    }
+    else if (part == kStateLost) {
         bgt_set_color(BGT_RED);
         bgt_draw_text(text_x, 440, "踩雷了！", 22);
     }
@@ -487,10 +499,12 @@ void draw_frame()
         bgt_set_color(BGT_BLACK);
         draw_center_text("检测到未完成的一局！", 210, 32);
         draw_center_text("按【L】继续上局，按【N】开新局", 270, 24);
-    } else if (part == kStateWon) {
+    }
+    else if (part == kStateWon) {
         bgt_set_color(BGT_GREEN);
         draw_center_text("胜利！", 240, 48);
-    } else if (part == kStateLost) {
+    }
+    else if (part == kStateLost) {
         bgt_set_color(BGT_RED);
         draw_center_text("踩雷了！", 240, 48);
     }
@@ -523,19 +537,22 @@ int main()
 
         if (part == kStatePrompt) {
             if (bgt_key_just_pressed(BGT_KEY_L)) {
-                parse_board_string();  ///< 按 L：再解析一次并重置计时基准
-                part = kStatePlaying;
-            } else if (bgt_key_just_pressed(BGT_KEY_N)) {
-                fresh_game();  ///< 丢弃存档局面，开新局
+                parse_board_string(); ///< 按 L：再解析一次并重置计时基准
                 part = kStatePlaying;
             }
-        } else if (part == kStatePlaying) {
+            else if (bgt_key_just_pressed(BGT_KEY_N)) {
+                fresh_game(); ///< 丢弃存档局面，开新局
+                part = kStatePlaying;
+            }
+        }
+        else if (part == kStatePlaying) {
             if (bgt_key_just_pressed(BGT_KEY_R)) {
-                fresh_game();  ///< R：重开一局，停在状态 1
+                fresh_game(); ///< R：重开一局，停在状态 1
             }
             handle_left_click();
             handle_right_click();
-        } else if (part == kStateWon || part == kStateLost) {
+        }
+        else if (part == kStateWon || part == kStateLost) {
             if (bgt_key_just_pressed(BGT_KEY_R)) {
                 fresh_game();
                 part = kStatePlaying;
@@ -553,4 +570,5 @@ int main()
 }
 
 // NOLINTEND(readability-magic-numbers, readability-identifier-length,
-// readability-function-cognitive-complexity, bugprone-easily-swappable-parameters)
+// readability-function-cognitive-complexity,
+// bugprone-easily-swappable-parameters)

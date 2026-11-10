@@ -53,9 +53,8 @@ int main()
 
     /// 板块 4：数独盘面（81 个字符，'.' 表示空格）
     /// 没存过盘面时，get 的默认值就是当前屏幕上的盘面（原地保持）。
-    char board[82] =
-        "53..7....6..195....98....6.8...6...34..8.3..1"
-        "7...2...6.6....28....419..5....8..79";
+    char board[82] = "53..7....6..195....98....6.8...6...34..8.3..1"
+                     "7...2...6.6....28....419..5....8..79";
     bgt_get_string("盘面", "board", board, 82, board);
     /// 手改存档可能把盘面改短：结束符后面的格子补成“空”（.），
     /// 免得上一次盘面的残尾数字混进画面。
@@ -95,9 +94,10 @@ int main()
             bgt_set_color(BGT_DARK_GRAY);
             bgt_draw_text(80, 300,
                           "每按一次【回车】得分 +10；破纪录时立刻写进 "
-                          "save.txt。", 22);
-            bgt_draw_text(80, 340,
-                          "关掉这个窗口，再重新运行程序——最高分还在！", 22);
+                          "save.txt。",
+                          22);
+            bgt_draw_text(80, 340, "关掉这个窗口，再重新运行程序——最高分还在！",
+                          22);
         }
 
         /// ---------- 板块 2：记事本透明度 ----------
@@ -120,8 +120,10 @@ int main()
                 }
             }
             bgt_set_color(BGT_BLACK);
-            bgt_draw_text(40, 36, "板块 2：save.txt 的内容 —— 文本存档看得见", 32);
-            bgt_draw_text(80, 130, "存档文件 save.txt 现在长这样（按字典序）：", 22);
+            bgt_draw_text(40, 36, "板块 2：save.txt 的内容 —— 文本存档看得见",
+                          32);
+            bgt_draw_text(80, 130, "存档文件 save.txt 现在长这样（按字典序）：",
+                          22);
             /// 存档没有“整表打印”函数：每个键都是自己存进去的，
             /// 直接逐个取出来，照文件里的样子画。
             bgt_set_color(BGT_BLUE);
@@ -143,10 +145,12 @@ int main()
             bgt_set_color(BGT_DARK_GRAY);
             bgt_draw_text(80, 330,
                           "用记事本打开 save.txt 改一改（比如把 best 改成 "
-                          "999），", 22);
+                          "999），",
+                          22);
             bgt_draw_text(80, 370,
                           "保存后回到这里按【R】——改动立刻生效。存档就是普通"
-                          "文本！", 22);
+                          "文本！",
+                          22);
         }
 
         /// ---------- 板块 3：玩家名字 ----------
@@ -166,8 +170,8 @@ int main()
             std::snprintf(name_text, sizeof(name_text), "当前玩家：%s", name);
             bgt_draw_text(80, 200, name_text, 32);
             bgt_set_color(BGT_DARK_GRAY);
-            bgt_draw_text(80, 320,
-                          "按【N】换一个名字，换完立刻写进 save.txt。", 22);
+            bgt_draw_text(80, 320, "按【N】换一个名字，换完立刻写进 save.txt。",
+                          22);
             bgt_draw_text(80, 360,
                           "读字符串要有一个数组接住它：bgt_get_string。", 22);
         }
@@ -191,9 +195,11 @@ int main()
                 const int index = cursor_row * 9 + cursor_col;
                 if (board[index] == '.') {
                     board[index] = '1';
-                } else if (board[index] == '9') {
+                }
+                else if (board[index] == '9') {
                     board[index] = '.';
-                } else {
+                }
+                else {
                     board[index] = board[index] + 1;
                 }
             }
@@ -202,7 +208,8 @@ int main()
                 if (bgt_save("save.txt")) {
                     std::snprintf(action_text, sizeof(action_text),
                                   "已存档：盘面写进了 save.txt");
-                } else {
+                }
+                else {
                     std::snprintf(action_text, sizeof(action_text),
                                   "存档失败：save.txt 写不进去");
                 }
@@ -221,7 +228,8 @@ int main()
                     }
                     std::snprintf(action_text, sizeof(action_text),
                                   "已读档：从 save.txt 恢复盘面");
-                } else {
+                }
+                else {
                     std::snprintf(action_text, sizeof(action_text),
                                   "读档失败：save.txt 读不出来");
                 }
@@ -245,7 +253,8 @@ int main()
                     cell_text[0] = board[index];
                     if (board[index] == '.') {
                         bgt_set_color(BGT_LIGHT_GRAY);
-                    } else {
+                    }
+                    else {
                         bgt_set_color(BGT_BLACK);
                     }
                     bgt_draw_text(cell_x + 8, cell_y + 4, cell_text, 24);
@@ -255,18 +264,21 @@ int main()
             bgt_draw_text(80, 470, action_text, 22);
             bgt_draw_text(80, 510,
                           "方向键移动光标，回车改数字；【S】存盘面，【L】读盘"
-                          "面。", 22);
+                          "面。",
+                          22);
             bgt_draw_text(80, 550,
                           "改几个格子，按【S】存档，关掉程序再运行按【L】——"
-                          "盘面还在。", 22);
+                          "盘面还在。",
+                          22);
         }
 
         /// 底部统一提示
         bgt_set_color(BGT_DARK_GRAY);
         if (part < 4) {
-            bgt_draw_text(40, 648,
-                          "按【空格】进入下一板块，按【Esc】退出程序", 24);
-        } else {
+            bgt_draw_text(40, 648, "按【空格】进入下一板块，按【Esc】退出程序",
+                          24);
+        }
+        else {
             bgt_draw_text(40, 648,
                           "按【Esc】退出程序 —— save.txt 留在程序目录里", 24);
         }
@@ -275,7 +287,8 @@ int main()
         if (bgt_key_just_pressed(BGT_KEY_SPACE)) {
             if (part < 4) {
                 part = part + 1;
-            } else {
+            }
+            else {
                 break;
             }
         }

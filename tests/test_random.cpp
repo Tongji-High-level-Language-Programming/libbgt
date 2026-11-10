@@ -23,13 +23,13 @@ int g_failed_checks = 0;
 /**
  * @brief 显式检查宏：失败时打印表达式与位置，任何构建配置下都生效。
  */
-#define BGT_CHECK(condition)                                            \
-    do {                                                                \
-        if (!(condition)) {                                             \
-            std::fprintf(stderr, "FAILED: %s (%s:%d)\n", #condition,    \
-                         __FILE__, __LINE__);                           \
-            g_failed_checks = g_failed_checks + 1;                      \
-        }                                                               \
+#define BGT_CHECK(condition)                                                   \
+    do {                                                                       \
+        if (!(condition)) {                                                    \
+            std::fprintf(stderr, "FAILED: %s (%s:%d)\n", #condition, __FILE__, \
+                         __LINE__);                                            \
+            g_failed_checks = g_failed_checks + 1;                             \
+        }                                                                      \
     } while (false)
 
 /**
@@ -80,8 +80,8 @@ int main()
     }
 
     /// 2) 半开区间：min 能取到，max 取不到
-    check_all_values_appear(0, 6);    ///< 0~5，正好当长度 6 的数组下标
-    check_all_values_appear(-3, 4);   ///< -3~3
+    check_all_values_appear(0, 6);  ///< 0~5，正好当长度 6 的数组下标
+    check_all_values_appear(-3, 4); ///< -3~3
 
     /// 3) min > max 时自动交换
     for (int i = 0; i < 1000; i++) {
@@ -100,7 +100,7 @@ int main()
         BGT_CHECK(value < 1.0);
     }
     for (int i = 0; i < 1000; i++) {
-        const double value = bgt_random(5.0, 2.0);    ///< 交换后 [2, 5)
+        const double value = bgt_random(5.0, 2.0); ///< 交换后 [2, 5)
         BGT_CHECK(value >= 2.0 && value < 5.0);
     }
 

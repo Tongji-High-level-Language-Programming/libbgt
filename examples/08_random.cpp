@@ -43,16 +43,16 @@ int main()
     int last_roll = 1;
 
     /// 板块 2：星星调色板（星空画在深色背景上）
-    const unsigned star_colors[6] = {BGT_WHITE, BGT_YELLOW, BGT_CYAN,
+    const unsigned star_colors[6] = {BGT_WHITE,   BGT_YELLOW, BGT_CYAN,
                                      BGT_MAGENTA, BGT_ORANGE, BGT_PINK};
 
     /// 板块 3：八只随机游走的小虫
     bool walk_started = false;
     int walker_x[8];
     int walker_y[8];
-    const unsigned walker_colors[8] = {BGT_RED, BGT_BLUE, BGT_GREEN,
+    const unsigned walker_colors[8] = {BGT_RED,    BGT_BLUE,   BGT_GREEN,
                                        BGT_ORANGE, BGT_PURPLE, BGT_BROWN,
-                                       BGT_CYAN, BGT_MAGENTA};
+                                       BGT_CYAN,   BGT_MAGENTA};
 
     /// 板块 4：种子对比
     bool seed_demo_ready = false;
@@ -96,9 +96,8 @@ int main()
                           "掷六面骰要写 bgt_random(1, 7)：可能得到 1~6，"
                           "7 永远不会出现。",
                           20);
-            bgt_draw_text(40, 162,
-                          "参数写反也没关系——min 大于 max 时库会自动交换。",
-                          20);
+            bgt_draw_text(
+                40, 162, "参数写反也没关系——min 大于 max 时库会自动交换。", 20);
 
             /// 画骰子：白底黑框，按点数画骰面
             const int die_x = 80;
@@ -242,11 +241,9 @@ int main()
 
             /// 把样例星画成黄色并加白圈，方便和下方数字对照
             bgt_set_color(BGT_YELLOW);
-            bgt_fill_circle(sample_x, sample_y,
-                            static_cast<int>(sample_r) + 2);
+            bgt_fill_circle(sample_x, sample_y, static_cast<int>(sample_r) + 2);
             bgt_set_color(BGT_WHITE);
-            bgt_draw_circle(sample_x, sample_y,
-                            static_cast<int>(sample_r) + 6);
+            bgt_draw_circle(sample_x, sample_y, static_cast<int>(sample_r) + 6);
 
             /// 文字最后画，保证可读
             bgt_set_color(BGT_WHITE);
@@ -371,8 +368,7 @@ int main()
                           "10 个数。",
                           20);
             bgt_draw_text(40, 162,
-                          "右列不播种，延续全局序列 —— 每次按 R 都不同。",
-                          20);
+                          "右列不播种，延续全局序列 —— 每次按 R 都不同。", 20);
 
             bgt_set_color(BGT_BLUE);
             bgt_draw_text(40, 205, "先 seed(42)，再取 10 个：", 20);

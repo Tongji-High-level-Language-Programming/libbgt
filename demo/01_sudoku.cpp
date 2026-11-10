@@ -193,9 +193,8 @@ bool read_puzzle_from_file(SudokuState &s, const char *filename)
 
 void load_puzzle(SudokuState &s)
 {
-    s.loaded_from_file =
-        read_puzzle_from_file(s, "01_sudoku_puzzle.txt") ||
-        read_puzzle_from_file(s, "demo/01_sudoku_puzzle.txt");
+    s.loaded_from_file = read_puzzle_from_file(s, "01_sudoku_puzzle.txt") ||
+                         read_puzzle_from_file(s, "demo/01_sudoku_puzzle.txt");
     if (s.loaded_from_file) {
         return;
     }

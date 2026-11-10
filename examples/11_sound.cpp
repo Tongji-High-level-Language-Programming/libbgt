@@ -70,19 +70,19 @@ int main()
                 boom_count = boom_count + 1;
             }
             bgt_set_color(BGT_BLACK);
-            bgt_draw_text(40, 36,
-                          "板块 1：音效 —— 按【1】【2】【3】触发", 32);
+            bgt_draw_text(40, 36, "板块 1：音效 —— 按【1】【2】【3】触发", 32);
             char count_text[96] = {};
             std::snprintf(count_text, sizeof(count_text),
                           "跳跃 %d 次，叮咚 %d 次，爆炸 %d 次", jump_count,
                           ding_count, boom_count);
             bgt_draw_text(80, 160, count_text, 26);
             bgt_set_color(BGT_DARK_GRAY);
-            bgt_draw_text(80, 300,
-                          "连按同一个键：每次按键都是一次新的发声，", 22);
+            bgt_draw_text(80, 300, "连按同一个键：每次按键都是一次新的发声，",
+                          22);
             bgt_draw_text(80, 340,
                           "多个声音会自动混在一起"
-                          "——这就是音效的“重叠”。", 22);
+                          "——这就是音效的“重叠”。",
+                          22);
         }
 
         /// ---------- 板块 2：音量台 ----------
@@ -131,9 +131,10 @@ int main()
             bgt_set_color(BGT_DARK_GRAY);
             bgt_draw_text(80, 420,
                           "音量范围 0-100：0 静音、100 最响"
-                          "（库还会把越界值", 22);
-            bgt_draw_text(80, 460,
-                          "自动收到边界，所以怎么按都不会出错）。", 22);
+                          "（库还会把越界值",
+                          22);
+            bgt_draw_text(80, 460, "自动收到边界，所以怎么按都不会出错）。",
+                          22);
         }
 
         /// ---------- 板块 3：背景音乐 ----------
@@ -142,7 +143,8 @@ int main()
             if (bgt_key_just_pressed(BGT_KEY_P)) {
                 if (bgt_play_music("11_melody.wav")) {
                     music_started = true;
-                } else {
+                }
+                else {
                     bgt_print_error();
                 }
             }
@@ -151,18 +153,20 @@ int main()
                 music_started = false;
             }
             bgt_set_color(BGT_BLACK);
-            bgt_draw_text(40, 36,
-                          "板块 3：背景音乐 —— 流式播放、默认循环", 32);
+            bgt_draw_text(40, 36, "板块 3：背景音乐 —— 流式播放、默认循环", 32);
             bgt_draw_text(80, 160, "【P】播放 11_melody.wav    【S】停止", 26);
             bgt_set_color(BGT_DARK_GRAY);
             if (music_started) {
                 bgt_draw_text(80, 260,
                               "正在播放（循环中）。播放中再按【P】"
-                              "会自动切歌：", 22);
+                              "会自动切歌：",
+                              22);
                 bgt_draw_text(80, 300,
                               "这首曲子会从头开始"
-                              "——因为同一时刻只有一首音乐。", 22);
-            } else {
+                              "——因为同一时刻只有一首音乐。",
+                              22);
+            }
+            else {
                 bgt_draw_text(80, 260, "现在没有音乐在播。按【P】试试。", 22);
             }
             bgt_draw_text(80, 420,
@@ -181,7 +185,8 @@ int main()
             bgt_draw_text(40, 36, "板块 4：错误处理 —— 播不存在的文件", 32);
             bgt_draw_text(80, 160,
                           "按【E】播放 missing_file.wav"
-                          "（一个不存在的文件）", 26);
+                          "（一个不存在的文件）",
+                          26);
             bgt_draw_text(80, 220, "最近一次错误：", 22);
             bgt_set_color(BGT_RED);
             bgt_draw_error(80, 260, 22);
@@ -195,19 +200,22 @@ int main()
         /// 底部统一提示
         bgt_set_color(BGT_DARK_GRAY);
         if (part < 4) {
-            bgt_draw_text(40, 648,
-                          "按【空格】进入下一板块，按【Esc】退出程序", 24);
-        } else {
+            bgt_draw_text(40, 648, "按【空格】进入下一板块，按【Esc】退出程序",
+                          24);
+        }
+        else {
             bgt_draw_text(40, 648,
                           "按【空格】或【Esc】退出程序"
-                          " —— 声音随窗口一起清理", 24);
+                          " —— 声音随窗口一起清理",
+                          24);
         }
 
         /// 每个板块都支持按空格进入下一板块；最后一个板块按空格关闭
         if (bgt_key_just_pressed(BGT_KEY_SPACE)) {
             if (part < 4) {
                 part = part + 1;
-            } else {
+            }
+            else {
                 break;
             }
         }

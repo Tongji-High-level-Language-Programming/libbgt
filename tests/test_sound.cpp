@@ -20,13 +20,13 @@ int g_failed_checks = 0;
 /**
  * @brief 显式检查宏：失败时打印表达式与位置，任何构建配置下都生效。
  */
-#define BGT_CHECK(condition)                                            \
-    do {                                                                \
-        if (!(condition)) {                                             \
-            std::fprintf(stderr, "FAILED: %s (%s:%d)\n", #condition,    \
-                         __FILE__, __LINE__);                           \
-            g_failed_checks = g_failed_checks + 1;                      \
-        }                                                                \
+#define BGT_CHECK(condition)                                                   \
+    do {                                                                       \
+        if (!(condition)) {                                                    \
+            std::fprintf(stderr, "FAILED: %s (%s:%d)\n", #condition, __FILE__, \
+                         __LINE__);                                            \
+            g_failed_checks = g_failed_checks + 1;                             \
+        }                                                                      \
     } while (false)
 
 } // namespace

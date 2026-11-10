@@ -9,7 +9,8 @@
 #include "bgt_encoding.h"
 
 #if !defined(_WIN32) && BGT_SOURCE_ENCODING == BGT_ENCODING_GBK
-#error "GBK source encoding is implemented on Windows only; an iconv backend is reserved in src/bgt_encoding.cpp"
+#error                                                                         \
+    "GBK source encoding is implemented on Windows only; an iconv backend is reserved in src/bgt_encoding.cpp"
 #endif
 
 #if defined(_WIN32)
@@ -50,7 +51,8 @@ constexpr std::size_t encoded_char_bytes(unsigned char byte)
             return 2;
         }
         return 1;
-    } else {
+    }
+    else {
         /// GBK 尾字节范围 0x40-0xFE，因此 ASCII（< 0x40）永远不会被当作
         /// 尾字节，但尾字节可能是 [ ] # 等符号——这正是不能用 find() 直接
         /// 搜索的原因。
@@ -94,8 +96,8 @@ bool widen(const std::string &text, Encoding from, bool strict,
     const int length = static_cast<int>(text.size());
     const DWORD flags =
         (strict && from == Encoding::Utf8) ? MB_ERR_INVALID_CHARS : 0;
-    const int wide_length = MultiByteToWideChar(code_page, flags, text.data(),
-                                                length, nullptr, 0);
+    const int wide_length =
+        MultiByteToWideChar(code_page, flags, text.data(), length, nullptr, 0);
     if (wide_length <= 0) {
         return false;
     }
@@ -135,7 +137,8 @@ bool narrow(const std::wstring &text, Encoding to, bool strict,
     DWORD flags = 0;
     if (strict && to == Encoding::Utf8) {
         flags = WC_ERR_INVALID_CHARS;
-    } else if (check_default) {
+    }
+    else if (check_default) {
         /// 关掉 Windows 的“最佳拟合”：否则 U+00B2 会被静默换成 '2'
         /// （used_default 仍为 FALSE），严格转换就漏掉了这种悄悄改字的
         /// 情况。
@@ -144,9 +147,9 @@ bool narrow(const std::wstring &text, Encoding to, bool strict,
     BOOL used_default = FALSE;
     BOOL *used_default_ptr = check_default ? &used_default : nullptr;
 
-    const int byte_length = WideCharToMultiByte(code_page, flags, text.data(),
-                                                length, nullptr, 0, nullptr,
-                                                used_default_ptr);
+    const int byte_length =
+        WideCharToMultiByte(code_page, flags, text.data(), length, nullptr, 0,
+                            nullptr, used_default_ptr);
     if (byte_length <= 0) {
         return false;
     }
@@ -218,7 +221,8 @@ std::string to_utf8(const std::string &text)
 {
     if constexpr (kSourceEncoding == Encoding::Utf8) {
         return text;
-    } else {
+    }
+    else {
         return convert(text, Encoding::Gbk, Encoding::Utf8);
     }
 }
@@ -230,7 +234,8 @@ std::string from_utf8(const char *text)
     }
     if constexpr (kSourceEncoding == Encoding::Utf8) {
         return std::string(text);
-    } else {
+    }
+    else {
         return convert(text, Encoding::Utf8, Encoding::Gbk);
     }
 }
@@ -239,7 +244,8 @@ std::string from_utf8(const std::string &text)
 {
     if constexpr (kSourceEncoding == Encoding::Utf8) {
         return text;
-    } else {
+    }
+    else {
         return convert(text, Encoding::Utf8, Encoding::Gbk);
     }
 }
@@ -304,7 +310,8 @@ bool encoded_ends_with_ascii(const std::string &text, char ascii)
         index += char_bytes;
     }
     return has_last && text[last_start] == ascii &&
-           encoded_char_bytes(static_cast<unsigned char>(text[last_start])) == 1;
+           encoded_char_bytes(static_cast<unsigned char>(text[last_start])) ==
+               1;
 }
 
 } // namespace bgt

@@ -1,7 +1,9 @@
 /**
  * @file 02_hanoi.cpp
- * @brief 汉诺塔演示：开始 / 游戏中 / 完成三态流程；游戏中支持手动游玩与递归自动演示。
- * @details 参考 `docs/exercises.md` 的作业题库（汉诺塔一节）；本文件是其参考实现。
+ * @brief 汉诺塔演示：开始 / 游戏中 /
+ * 完成三态流程；游戏中支持手动游玩与递归自动演示。
+ * @details 参考 `docs/exercises.md`
+ * 的作业题库（汉诺塔一节）；本文件是其参考实现。
  */
 
 #include "bgt.h"
@@ -9,7 +11,8 @@
 #include <cstdio>
 
 // NOLINTBEGIN(readability-magic-numbers, readability-identifier-length,
-// readability-function-cognitive-complexity, bugprone-easily-swappable-parameters)
+// readability-function-cognitive-complexity,
+// bugprone-easily-swappable-parameters)
 
 namespace {
 
@@ -30,7 +33,7 @@ constexpr int kDiskHeight = 36;
 constexpr int kMinDiskWidth = 48;
 constexpr int kDiskWidthStep = 30;
 
-constexpr int kMoveSpeed = 2;     ///< 每秒完成的移动数
+constexpr int kMoveSpeed = 2;          ///< 每秒完成的移动数
 constexpr double kAutoInterval = 0.6;  ///< 自动演示中两次移动的间隔（秒）
 constexpr double kSelectRepeat = 0.18; ///< 按住方向键时重复选柱的间隔（秒）
 constexpr int kMaxAutoSteps = (1 << kDisks) - 1;
@@ -44,27 +47,27 @@ constexpr unsigned kDiskColors[kDisks + 1] = {BGT_BLACK, BGT_RED, BGT_BLUE,
 
 /// ---- 局面数据（不引入类、结构体和指针，全部用全局变量与数组）----
 
-int towers[kTowerCount][kDisks];    ///< 每根柱子从下往上存的盘号
-int heights[kTowerCount];           ///< 每根柱子当前盘数
+int towers[kTowerCount][kDisks]; ///< 每根柱子从下往上存的盘号
+int heights[kTowerCount];        ///< 每根柱子当前盘数
 int state = kStateStart;
-int selected = 0;                   ///< 当前高亮柱子
-double select_repeat_timer = 0.0;   ///< 按住方向键时的重复选柱计时
+int selected = 0;                 ///< 当前高亮柱子
+double select_repeat_timer = 0.0; ///< 按住方向键时的重复选柱计时
 int move_count = 0;
 
-bool holding = false;               ///< 隐式状态：是否拿着盘子
+bool holding = false; ///< 隐式状态：是否拿着盘子
 int held_disk = 0;
-int pickup_from = 0;                ///< 盘子是从哪根柱子拿起来的
+int pickup_from = 0; ///< 盘子是从哪根柱子拿起来的
 
-double anim_t = 1.0;                ///< 动画进度，1.0 表示没有动画
+double anim_t = 1.0; ///< 动画进度，1.0 表示没有动画
 int anim_from = 0;
 int anim_to = 0;
-double hint_time = -1.0;            ///< 非法移动提示的开始时间
+double hint_time = -1.0; ///< 非法移动提示的开始时间
 
-bool auto_mode = false;             ///< 隐式状态：是否在自动演示
+bool auto_mode = false; ///< 隐式状态：是否在自动演示
 double auto_timer = 0.0;
 int auto_index = 0;
 int auto_write = 0;
-int auto_moves[kMaxAutoSteps][2];   ///< 递归生成的移动序列：from -> to
+int auto_moves[kMaxAutoSteps][2]; ///< 递归生成的移动序列：from -> to
 
 int tower_x(int tower)
 {
@@ -85,7 +88,7 @@ void reset_game()
         }
     }
     for (int i = 0; i < kDisks; ++i) {
-        towers[0][i] = kDisks - i;   ///< 大盘在下，小盘在上
+        towers[0][i] = kDisks - i; ///< 大盘在下，小盘在上
         heights[0] += 1;
     }
     selected = 0;
@@ -161,7 +164,8 @@ void move_selection()
             }
             select_repeat_timer = 0.0;
         }
-    } else if (right_held && !left_held) {
+    }
+    else if (right_held && !left_held) {
         if (bgt_key_just_pressed(BGT_KEY_RIGHT) ||
             select_repeat_timer >= kSelectRepeat) {
             if (selected < kTowerCount - 1) {
@@ -169,7 +173,8 @@ void move_selection()
             }
             select_repeat_timer = 0.0;
         }
-    } else {
+    }
+    else {
         select_repeat_timer = 0.0;
     }
 }
@@ -184,7 +189,7 @@ void update_playing()
 
     if (auto_mode) {
         if (bgt_key_just_pressed(BGT_KEY_S)) {
-            auto_mode = false;   ///< 停止演示，当前局面交还手动
+            auto_mode = false; ///< 停止演示，当前局面交还手动
         }
         if (auto_mode && anim_t >= 1.0 && auto_index < kMaxAutoSteps) {
             auto_timer += bgt_delta_time();
@@ -200,7 +205,7 @@ void update_playing()
                     holding = true;
                     anim_from = from;
                     anim_to = to;
-                    selected = to;   ///< 高亮跟随演示步骤
+                    selected = to; ///< 高亮跟随演示步骤
                     anim_t = 0.0;
                 }
             }
@@ -224,20 +229,23 @@ void update_playing()
                 pickup_from = selected;
                 holding = true;
             }
-        } else if (bgt_key_just_pressed(BGT_KEY_SPACE)) {
-            const bool legal = heights[selected] == 0 ||
+        }
+        else if (bgt_key_just_pressed(BGT_KEY_SPACE)) {
+            const bool legal =
+                heights[selected] == 0 ||
                 towers[selected][heights[selected] - 1] > held_disk;
             if (legal) {
                 anim_from = pickup_from;
                 anim_to = selected;
                 anim_t = 0.0;
-            } else {
+            }
+            else {
                 hint_time = bgt_total_time();
             }
         }
     }
 
-    advance_animation();   ///< 动画播放中，忽略其他输入
+    advance_animation(); ///< 动画播放中，忽略其他输入
 }
 
 /// ---- 绘制 ----
@@ -278,16 +286,19 @@ void draw_held_disk()
             const double k = anim_t / kLiftEnd;
             x = x_from;
             y = y_from + static_cast<int>((kCarryY - y_from) * k);
-        } else if (anim_t < kCarryEnd) {
+        }
+        else if (anim_t < kCarryEnd) {
             const double k = (anim_t - kLiftEnd) / (kCarryEnd - kLiftEnd);
             x = x_from + static_cast<int>((x_to - x_from) * k);
             y = kCarryY;
-        } else {
+        }
+        else {
             const double k = (anim_t - kCarryEnd) / (1.0 - kCarryEnd);
             x = x_to;
             y = kCarryY + static_cast<int>((y_to - kCarryY) * k);
         }
-    } else {
+    }
+    else {
         /// 悬在被取出的柱子上方，水平位置不变
         x = tower_x(pickup_from);
         y = kBaseY - (heights[pickup_from] + 2) * kDiskHeight;
@@ -305,8 +316,8 @@ void draw_marker()
     const char marker[] = "▼";
     const int w = bgt_text_width(marker, 30);
     bgt_set_color(BGT_ORANGE);
-    bgt_draw_text(tower_x(selected) - w / 2, kBaseY - kTowerHeight - 48,
-                  marker, 30);
+    bgt_draw_text(tower_x(selected) - w / 2, kBaseY - kTowerHeight - 48, marker,
+                  30);
 }
 
 void draw_center_text(int cx, int y, const char text[], int size)
@@ -339,13 +350,16 @@ void draw_frame()
     char info[64];
     if (state == kStateStart) {
         bgt_draw_text(40, 70, "按空格开始游戏（Esc 退出）", 20);
-    } else if (state == kStatePlaying && auto_mode) {
-        bgt_draw_text(40, 70,
-                      "自动演示中…（S 停止，R 重新开始，Esc 退出）", 20);
-    } else if (state == kStatePlaying) {
+    }
+    else if (state == kStatePlaying && auto_mode) {
+        bgt_draw_text(40, 70, "自动演示中…（S 停止，R 重新开始，Esc 退出）",
+                      20);
+    }
+    else if (state == kStatePlaying) {
         bgt_draw_text(40, 70,
                       "←/→ 选柱，空格 拿起/放下，S 自动演示，R 重新开始", 20);
-    } else {
+    }
+    else {
         std::snprintf(info, sizeof(info),
                       "完成！共 %d 步，最少 %d 步。按 R 重新开始", move_count,
                       kMaxAutoSteps);
@@ -384,9 +398,11 @@ int main()
             if (bgt_key_just_pressed(BGT_KEY_SPACE)) {
                 state = kStatePlaying;
             }
-        } else if (state == kStatePlaying) {
+        }
+        else if (state == kStatePlaying) {
             update_playing();
-        } else if (state == kStateDone) {
+        }
+        else if (state == kStateDone) {
             if (bgt_key_just_pressed(BGT_KEY_R)) {
                 reset_game();
                 state = kStateStart;
@@ -402,4 +418,5 @@ int main()
 }
 
 // NOLINTEND(readability-magic-numbers, readability-identifier-length,
-// readability-function-cognitive-complexity, bugprone-easily-swappable-parameters)
+// readability-function-cognitive-complexity,
+// bugprone-easily-swappable-parameters)

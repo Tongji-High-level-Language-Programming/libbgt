@@ -11,36 +11,37 @@
 #include <cstdio>
 
 // NOLINTBEGIN(readability-magic-numbers, readability-identifier-length,
-// readability-function-cognitive-complexity, bugprone-easily-swappable-parameters)
+// readability-function-cognitive-complexity,
+// bugprone-easily-swappable-parameters)
 
 namespace {
 
 constexpr int kWindowWidth = 800;
 constexpr int kWindowHeight = 600;
 constexpr int kTargetFps = 60;
-constexpr int kFieldWidth = 600;        ///< 左墙 x=0，右墙 x=600
-constexpr int kPanelX = 600;            ///< 右侧栏起点
+constexpr int kFieldWidth = 600; ///< 左墙 x=0，右墙 x=600
+constexpr int kPanelX = 600;     ///< 右侧栏起点
 constexpr int kPanelWidth = 200;
 constexpr int kBrickCols = 10;
 constexpr int kBrickRows = 6;
-constexpr int kBrickCount = kBrickCols * kBrickRows;  ///< 60
+constexpr int kBrickCount = kBrickCols * kBrickRows; ///< 60
 constexpr int kBrickW = 56;
 constexpr int kBrickH = 24;
-constexpr int kBrickStepX = 58;        ///< 56 砖 + 2 缝
-constexpr int kBrickStepY = 26;        ///< 24 砖 + 2 缝
-constexpr int kBrickLeftX = 11;        ///< 10 列共 578px，左右各余 11
+constexpr int kBrickStepX = 58; ///< 56 砖 + 2 缝
+constexpr int kBrickStepY = 26; ///< 24 砖 + 2 缝
+constexpr int kBrickLeftX = 11; ///< 10 列共 578px，左右各余 11
 constexpr int kBrickTopY = 60;
-constexpr int kBrickMissing = 3;       ///< 每关随机缺席砖数
+constexpr int kBrickMissing = 3; ///< 每关随机缺席砖数
 constexpr int kLevels = 3;
 constexpr int kPaddleW = 100;
 constexpr int kPaddleH = 16;
 constexpr int kPaddleY = 544;          ///< 距底 40
 constexpr double kPaddleSpeed = 500.0; ///< px/s
 constexpr int kBallR = 8;
-constexpr double kBallSpeed = 320.0;   ///< px/s，全游戏恒定
-constexpr double kPaddleBounceMax = 0.8;  ///< 挡板反弹 vx 上限比例
+constexpr double kBallSpeed = 320.0;     ///< px/s，全游戏恒定
+constexpr double kPaddleBounceMax = 0.8; ///< 挡板反弹 vx 上限比例
 constexpr int kLives = 3;
-constexpr int kBrickScore = 10;        ///< 每砖 10 分
+constexpr int kBrickScore = 10; ///< 每砖 10 分
 /// 过关奖励 = 50 * 关卡号（第 1 关 +50、第 2 关 +100、第 3 关 +150）
 
 constexpr int kStateStart = 0;
@@ -49,38 +50,38 @@ constexpr int kStateLevelClear = 2;
 constexpr int kStateWin = 3;
 constexpr int kStateGameOver = 4;
 
-constexpr unsigned kColorBackground = 0xFF181A26U;  ///< bgt_rgb(24, 26, 38)
-constexpr unsigned kColorPanel = 0xFF262A3AU;       ///< bgt_rgb(38, 42, 58)
+constexpr unsigned kColorBackground = 0xFF181A26U; ///< bgt_rgb(24, 26, 38)
+constexpr unsigned kColorPanel = 0xFF262A3AU;      ///< bgt_rgb(38, 42, 58)
 constexpr unsigned kColorPaddle = BGT_CYAN;
 constexpr unsigned kColorBall = BGT_WHITE;
-constexpr unsigned kColorHint = 0xFF9CA0B0U;       ///< bgt_rgb(156, 160, 176)
+constexpr unsigned kColorHint = 0xFF9CA0B0U; ///< bgt_rgb(156, 160, 176)
 constexpr unsigned kBrickColors[kBrickRows] = {
     BGT_RED, BGT_ORANGE, BGT_YELLOW, BGT_GREEN, BGT_CYAN, BGT_MAGENTA};
 
 const char *kLevelPatterns[kLevels][kBrickRows] = {
-    {"XXXXXXXXXX", "X........X", "X........X", "X........X",
-     "X........X", "XXXXXXXXXX"},                        ///< 第 1 关 空心方阵 28 砖
-    {"X.X.X.X.X.", ".X.X.X.X.X", "X.X.X.X.X.", ".X.X.X.X.X",
-     "X.X.X.X.X.", ".X.X.X.X.X"},                         ///< 第 2 关 棋盘 30 砖
-    {"....XX....", "...XXXX...", "..XXXXXX..", ".XXXXXXXX.",
-     "XXXXXXXXXX", "XXXXXXXXXX"},                         ///< 第 3 关 金字塔 48 砖
+    {"XXXXXXXXXX", "X........X", "X........X", "X........X", "X........X",
+     "XXXXXXXXXX"}, ///< 第 1 关 空心方阵 28 砖
+    {"X.X.X.X.X.", ".X.X.X.X.X", "X.X.X.X.X.", ".X.X.X.X.X", "X.X.X.X.X.",
+     ".X.X.X.X.X"}, ///< 第 2 关 棋盘 30 砖
+    {"....XX....", "...XXXX...", "..XXXXXX..", ".XXXXXXXX.", "XXXXXXXXXX",
+     "XXXXXXXXXX"}, ///< 第 3 关 金字塔 48 砖
 };
 
 /// ---- 局面数据（不引入类、结构体和指针，全部用全局变量与数组）----
 
-int part;                      ///< 状态机，取值为 kState* 常量
+int part; ///< 状态机，取值为 kState* 常量
 int score = 0;
 int lives = kLives;
 int level = 1;
 bool brick_alive[kBrickCount];
 int bricks_left = 0;
-int paddle_x = (kFieldWidth - kPaddleW) / 2;  ///< 250
+int paddle_x = (kFieldWidth - kPaddleW) / 2; ///< 250
 double ball_x = 0.0;
 double ball_y = 0.0;
 double ball_vx = 0.0;
 double ball_vy = 0.0;
 bool ball_stuck = true;
-int snd_bounce = 0;            ///< bgt_load_sound 结果，0 = 没加载上
+int snd_bounce = 0; ///< bgt_load_sound 结果，0 = 没加载上
 int snd_brick = 0;
 int snd_lose = 0;
 int snd_win = 0;
@@ -128,7 +129,7 @@ void load_level(int l)
             }
         }
     }
-    int removed = 0;   ///< 每关砖数 >= 28，随机抽缺席砖不会死循环
+    int removed = 0; ///< 每关砖数 >= 28，随机抽缺席砖不会死循环
     while (removed < kBrickMissing) {
         const int i = bgt_random(0, kBrickCount);
         if (brick_alive[i]) {
@@ -200,7 +201,8 @@ void update_playing()
         play(snd_lose);
         if (lives == 0) {
             part = kStateGameOver;
-        } else {
+        }
+        else {
             ball_stuck = true;
         }
         return;
@@ -208,9 +210,8 @@ void update_playing()
 
     /// 6. 挡板反弹：命中偏移决定 vx，速度模长恒定，向上推出防连击
     if (ball_vy > 0 &&
-        bgt_hit_circle_rect(static_cast<int>(ball_x),
-                            static_cast<int>(ball_y), kBallR, paddle_x,
-                            kPaddleY, kPaddleW, kPaddleH)) {
+        bgt_hit_circle_rect(static_cast<int>(ball_x), static_cast<int>(ball_y),
+                            kBallR, paddle_x, kPaddleY, kPaddleW, kPaddleH)) {
         double r = (ball_x - (paddle_x + kPaddleW / 2.0)) / (kPaddleW / 2.0);
         if (r < -1.0) {
             r = -1.0;
@@ -234,16 +235,16 @@ void update_playing()
             const int bx = brick_x(col);
             const int by = brick_y(row);
             if (bgt_hit_rect_rect(static_cast<int>(ball_x - kBallR),
-                                  static_cast<int>(ball_y - kBallR),
-                                  kBallR * 2, kBallR * 2, bx, by,
-                                  kBrickW, kBrickH)) {
+                                  static_cast<int>(ball_y - kBallR), kBallR * 2,
+                                  kBallR * 2, bx, by, kBrickW, kBrickH)) {
                 brick_alive[i] = false;
                 bricks_left -= 1;
                 score += kBrickScore;
                 play(snd_brick);
                 if (ball_x < bx || ball_x > bx + kBrickW) {
                     ball_vx = -ball_vx;
-                } else {
+                }
+                else {
                     ball_vy = -ball_vy;
                 }
             }
@@ -256,7 +257,8 @@ void update_playing()
         play(snd_win);
         if (level == kLevels) {
             part = kStateWin;
-        } else {
+        }
+        else {
             part = kStateLevelClear;
         }
     }
@@ -285,8 +287,7 @@ void draw_paddle_ball()
     bgt_draw_rect(paddle_x, kPaddleY, kPaddleW, kPaddleH);
 
     bgt_set_color(kColorBall);
-    bgt_fill_circle(static_cast<int>(ball_x), static_cast<int>(ball_y),
-                    kBallR);
+    bgt_fill_circle(static_cast<int>(ball_x), static_cast<int>(ball_y), kBallR);
 }
 
 void draw_center_text(const char text[], int y, int size)
@@ -314,7 +315,8 @@ void draw_panel()
         if (i < lives) {
             bgt_set_color(BGT_ORANGE);
             bgt_fill_circle(cx, 258, 12);
-        } else {
+        }
+        else {
             bgt_set_color(BGT_GRAY);
             bgt_draw_circle(cx, 258, 12);
         }
@@ -377,18 +379,22 @@ void draw_frame()
 {
     if (part == kStateStart) {
         draw_start_screen();
-    } else if (part == kStatePlaying) {
+    }
+    else if (part == kStatePlaying) {
         /// 绘制顺序：侧栏底 -> 砖 -> 挡板 -> 球 -> 侧栏内容
         bgt_set_color(kColorPanel);
         bgt_fill_rect(kPanelX, 0, kPanelWidth, kWindowHeight);
         draw_bricks();
         draw_paddle_ball();
         draw_panel();
-    } else if (part == kStateLevelClear) {
+    }
+    else if (part == kStateLevelClear) {
         draw_level_clear_screen();
-    } else if (part == kStateWin) {
+    }
+    else if (part == kStateWin) {
         draw_win_screen();
-    } else {
+    }
+    else {
         draw_game_over_screen();
     }
 }
@@ -423,18 +429,22 @@ int main()
                 load_level(1);
                 part = kStatePlaying;
             }
-        } else if (part == kStatePlaying) {
+        }
+        else if (part == kStatePlaying) {
             update_playing();
-        } else if (part == kStateLevelClear) {
+        }
+        else if (part == kStateLevelClear) {
             if (bgt_key_just_pressed(BGT_KEY_SPACE)) {
                 load_level(level + 1);
                 part = kStatePlaying;
             }
-        } else if (part == kStateWin) {
+        }
+        else if (part == kStateWin) {
             if (bgt_key_just_pressed(BGT_KEY_R)) {
                 part = kStateStart;
             }
-        } else if (part == kStateGameOver) {
+        }
+        else if (part == kStateGameOver) {
             if (bgt_key_just_pressed(BGT_KEY_R)) {
                 part = kStateStart;
             }
@@ -449,4 +459,5 @@ int main()
 }
 
 // NOLINTEND(readability-magic-numbers, readability-identifier-length,
-// readability-function-cognitive-complexity, bugprone-easily-swappable-parameters)
+// readability-function-cognitive-complexity,
+// bugprone-easily-swappable-parameters)

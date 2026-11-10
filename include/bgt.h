@@ -54,8 +54,8 @@
 /// 这里刻意用通用字符名 U+4E2D（即“中”）而不是直接写字面量：通用字符名在
 /// 源码里是纯 ASCII，因此无论本编译单元按哪种源字符集解析它，比较的都是
 /// “执行字符集把 U+4E2D 编成几个字节”——GBK 是 2，UTF-8 是 3。
-#if BGT_SOURCE_ENCODING == BGT_ENCODING_GBK && !defined(BGT_BUILDING_LIBRARY) && \
-    !defined(BGT_DISABLE_ENCODING_CHECK)
+#if BGT_SOURCE_ENCODING == BGT_ENCODING_GBK &&                                 \
+    !defined(BGT_BUILDING_LIBRARY) && !defined(BGT_DISABLE_ENCODING_CHECK)
 static_assert(sizeof("\u4E2D") - 1 == 2,
               "libbgt(GBK 构建)：本编译单元的执行字符集必须是 GBK。MSVC 请去掉 "
               "/utf-8（中文 Windows 的默认字符集就是 936），或显式加 "
@@ -234,7 +234,8 @@ static_assert(sizeof("\u4E2D") - 1 == 2,
  * @param width 窗口的逻辑宽度（像素）。
  * @param height 窗口的逻辑高度（像素）。
  * @param title 窗口标题，可以包含中文。
- * @return 创建成功返回 true；失败返回 false，此时可以调用 bgt_print_error() 查看原因。
+ * @return 创建成功返回 true；失败返回 false，此时可以调用 bgt_print_error()
+ * 查看原因。
  * @note 程序中通常只需要创建一个窗口。
  * @see bgt_close_window
  */
@@ -248,7 +249,8 @@ bool bgt_open_window(int width, int height, const char title[]);
  * @param width 窗口的逻辑宽度（像素）。
  * @param height 窗口的逻辑高度（像素）。
  * @param title 窗口标题，可以包含中文。
- * @return 创建成功返回 true；失败返回 false，此时可以调用 bgt_print_error() 查看原因。
+ * @return 创建成功返回 true；失败返回 false，此时可以调用 bgt_print_error()
+ * 查看原因。
  * @see bgt_open_window
  */
 bool bgt_open_window_resizable(int width, int height, const char title[]);
@@ -317,7 +319,8 @@ void bgt_set_window_title(const char title[]);
  * @param r 红色分量（0 到 255）。
  * @param g 绿色分量（0 到 255）。
  * @param b 蓝色分量（0 到 255）。
- * @return 不透明的无符号整数颜色值，可以传给 bgt_set_color() 或 bgt_set_background()。
+ * @return 不透明的无符号整数颜色值，可以传给 bgt_set_color() 或
+ * bgt_set_background()。
  */
 unsigned bgt_rgb(int r, int g, int b);
 
@@ -510,7 +513,8 @@ int bgt_get_line_width();
  * 加载。
  *
  * @param filename 图片文件路径（UTF-8 编码）。
- * @return 加载成功返回一个大于 0 的图片编号；失败返回 BGT_IMAGE_NONE（0），此时可以调用 bgt_print_error() 查看原因。
+ * @return 加载成功返回一个大于 0 的图片编号；失败返回
+ * BGT_IMAGE_NONE（0），此时可以调用 bgt_print_error() 查看原因。
  * @see bgt_draw_image
  */
 int bgt_load_image(const char filename[]);
@@ -917,12 +921,13 @@ bool bgt_hit_point_circle(int px, int py, int x, int y, int radius);
  * @param height2 第二个矩形高度。
  * @return 两个矩形实际重叠返回 true，否则返回 false。
  */
-bool bgt_hit_rect_rect(int x1, int y1, int width1, int height1,
-                       int x2, int y2, int width2, int height2);
+bool bgt_hit_rect_rect(int x1, int y1, int width1, int height1, int x2, int y2,
+                       int width2, int height2);
 
 /** @brief 判断两个圆是否实际重叠。
  *
- * 只有真实重叠才返回 true；恰好相切不算。radius1 或 radius2 小于等于 0 时恒返回 false。
+ * 只有真实重叠才返回 true；恰好相切不算。radius1 或 radius2 小于等于 0 时恒返回
+ * false。
  *
  * @param x1 第一个圆的圆心横坐标。
  * @param y1 第一个圆的圆心纵坐标。
@@ -950,8 +955,8 @@ bool bgt_hit_circle_circle(int x1, int y1, int radius1, int x2, int y2,
  * @param height 矩形高度。
  * @return 圆与矩形实际重叠返回 true，否则返回 false。
  */
-bool bgt_hit_circle_rect(int cx, int cy, int radius, int x, int y,
-                         int width, int height);
+bool bgt_hit_circle_rect(int cx, int cy, int radius, int x, int y, int width,
+                         int height);
 
 /** @} */
 
@@ -967,7 +972,8 @@ bool bgt_hit_circle_rect(int cx, int cy, int radius, int x, int y,
  * 出错：内存表变为空表并返回 true，适合游戏第一次运行的情况。
  *
  * @param filename 存档文件名。
- * @return 成功返回 true；文件存在但读不开、或里面有格式不对的行时返回 false 并记录错误（格式不对的行会被跳过，其他行照常读入）。
+ * @return 成功返回 true；文件存在但读不开、或里面有格式不对的行时返回 false
+ * 并记录错误（格式不对的行会被跳过，其他行照常读入）。
  */
 bool bgt_load(const char filename[]);
 
@@ -1060,8 +1066,8 @@ double bgt_get_double(const char section[], const char key[],
  * @param out_size out 数组的大小（字节数）。
  * @param default_value 节或键不存在时写入的默认字符串。
  */
-void bgt_get_string(const char section[], const char key[],
-                    char out[], int out_size, const char default_value[]);
+void bgt_get_string(const char section[], const char key[], char out[],
+                    int out_size, const char default_value[]);
 
 /** @} */
 
@@ -1076,7 +1082,8 @@ void bgt_get_string(const char section[], const char key[],
  * int 变量备用。
  *
  * @param filename 音效文件路径（UTF-8 编码）。
- * @return 编号大于 0 表示成功；加载失败返回 0 并记录错误，此时可以调用 bgt_print_error() 查看原因。
+ * @return 编号大于 0 表示成功；加载失败返回 0 并记录错误，此时可以调用
+ * bgt_print_error() 查看原因。
  * @see bgt_play_sound
  */
 int bgt_load_sound(const char filename[]);
@@ -1141,7 +1148,8 @@ bool bgt_has_error();
 
 /** @brief 返回错误历史中的条数。
  *
- * 历史最多保留 10 条：更早的错误会被最老的挤出。bgt_clear_error() 会清空全部历史。
+ * 历史最多保留 10 条：更早的错误会被最老的挤出。bgt_clear_error()
+ * 会清空全部历史。
  *
  * @return 错误历史中的条数。
  */

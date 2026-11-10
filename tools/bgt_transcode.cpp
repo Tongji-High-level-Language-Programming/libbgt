@@ -35,9 +35,8 @@ const char kUtf8Bom[] = "\xEF\xBB\xBF";
  */
 void print_usage()
 {
-    std::fprintf(stderr,
-                 "usage: bgt_transcode <source> <dest> <utf-8|gbk> "
-                 "[--prepend <line>]\n");
+    std::fprintf(stderr, "usage: bgt_transcode <source> <dest> <utf-8|gbk> "
+                         "[--prepend <line>]\n");
 }
 
 /**
@@ -89,7 +88,8 @@ bool read_file(const char *path, std::string &out)
  */
 bool write_file(const char *path, const std::string &text)
 {
-    std::ofstream file(path, std::ios::out | std::ios::binary | std::ios::trunc);
+    std::ofstream file(path,
+                       std::ios::out | std::ios::binary | std::ios::trunc);
     if (!file) {
         return false;
     }

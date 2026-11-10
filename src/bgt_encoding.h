@@ -44,8 +44,8 @@ namespace bgt {
  * GBK 对应 Windows 代码页 936。
  */
 enum class Encoding {
-    Utf8,  ///< UTF-8（默认）。
-    Gbk,   ///< GBK（Windows 代码页 936）。
+    Utf8, ///< UTF-8（默认）。
+    Gbk,  ///< GBK（Windows 代码页 936）。
 };
 
 /**
@@ -170,7 +170,7 @@ bool encoded_ends_with_ascii(const std::string &text, char ascii);
  * 生命周期与临时对象一样短，只能立即使用（不可拷贝、不可保存 `c_str()`）。
  */
 class Utf8View {
-public:
+  public:
     /**
      * @brief 从源编码的 C 字符串构造 UTF-8 视图。
      *
@@ -181,7 +181,8 @@ public:
         const char *value = text == nullptr ? "" : text;
         if constexpr (kSourceEncoding == Encoding::Utf8) {
             text_ = value;
-        } else {
+        }
+        else {
             storage_ = convert(value, Encoding::Gbk, Encoding::Utf8);
             text_ = storage_.c_str();
         }
@@ -204,9 +205,9 @@ public:
         return text_;
     }
 
-private:
-    std::string storage_;    ///< GBK 模式下的转换结果；UTF-8 模式下为空。
-    const char *text_ = "";  ///< 持有的 UTF-8 字符串，可能指向 storage_。
+  private:
+    std::string storage_;   ///< GBK 模式下的转换结果；UTF-8 模式下为空。
+    const char *text_ = ""; ///< 持有的 UTF-8 字符串，可能指向 storage_。
 };
 
 } // namespace bgt

@@ -116,9 +116,8 @@ int main()
 
             const int mouse_x = bgt_mouse_x();
             const int mouse_y = bgt_mouse_y();
-            const bool hover = bgt_hit_point_rect(mouse_x, mouse_y,
-                                                  button_x, button_y,
-                                                  button_w, button_h);
+            const bool hover = bgt_hit_point_rect(mouse_x, mouse_y, button_x,
+                                                  button_y, button_w, button_h);
 
             bgt_set_color(BGT_BLACK);
             bgt_draw_text(40, 36, "板块 1：点与矩形 —— 鼠标“悬停按钮”", 32);
@@ -160,14 +159,16 @@ int main()
 
             char hover_text[96];
             if (hover) {
-                std::snprintf(hover_text, sizeof(hover_text),
-                              "鼠标位置：(%d, %d) —— bgt_hit_point_rect 返回 true",
-                              mouse_x, mouse_y);
+                std::snprintf(
+                    hover_text, sizeof(hover_text),
+                    "鼠标位置：(%d, %d) —— bgt_hit_point_rect 返回 true",
+                    mouse_x, mouse_y);
             }
             else {
-                std::snprintf(hover_text, sizeof(hover_text),
-                              "鼠标位置：(%d, %d) —— bgt_hit_point_rect 返回 false",
-                              mouse_x, mouse_y);
+                std::snprintf(
+                    hover_text, sizeof(hover_text),
+                    "鼠标位置：(%d, %d) —— bgt_hit_point_rect 返回 false",
+                    mouse_x, mouse_y);
             }
             bgt_set_color(BGT_BLACK);
             bgt_draw_text(40, 450, hover_text, 20);
@@ -187,9 +188,8 @@ int main()
                 click_count = click_count + 1;
                 last_click_x = mouse_x;
                 last_click_y = mouse_y;
-                last_click_hit = bgt_hit_point_circle(mouse_x, mouse_y,
-                                                      target_x, target_y,
-                                                      target_r);
+                last_click_hit = bgt_hit_point_circle(
+                    mouse_x, mouse_y, target_x, target_y, target_r);
                 if (last_click_hit) {
                     hit_count = hit_count + 1;
                 }
@@ -269,9 +269,9 @@ int main()
                 player_y = window_height - player_h;
             }
 
-            const bool hit = bgt_hit_rect_rect(player_x, player_y, player_w,
-                                               player_h, wall_x, wall_y,
-                                               wall_w, wall_h);
+            const bool hit =
+                bgt_hit_rect_rect(player_x, player_y, player_w, player_h,
+                                  wall_x, wall_y, wall_w, wall_h);
 
             bgt_set_color(BGT_BLACK);
             bgt_draw_text(40, 36, "板块 3：矩形与矩形 —— 推方块撞挡板", 32);
@@ -280,8 +280,7 @@ int main()
                           "两个矩形实际重叠返回 true。",
                           20);
             bgt_draw_text(40, 128,
-                          "只要共有一像素的面积就算；恰好贴边、贴角不算。",
-                          20);
+                          "只要共有一像素的面积就算；恰好贴边、贴角不算。", 20);
             bgt_draw_text(40, 162, "方向键移动绿色方块，撞上灰色挡板。", 20);
 
             /// 固定挡板
@@ -309,8 +308,8 @@ int main()
             }
             else {
                 std::snprintf(hit_text, sizeof(hit_text),
-                              "方块位置：(%d, %d) —— 没有重叠",
-                              player_x, player_y);
+                              "方块位置：(%d, %d) —— 没有重叠", player_x,
+                              player_y);
             }
             bgt_set_color(BGT_BLACK);
             bgt_draw_text(40, 596, hit_text, 20);
@@ -351,12 +350,12 @@ int main()
                           "圆心距小于 r1+r2 才算命中。",
                           20);
             bgt_draw_text(40, 128,
-                          "方向键移动绿圆慢慢靠近灰圆——真正压上才会变红。",
-                          20);
-            bgt_draw_text(40, 162,
-                          "试试停在“看起来刚碰上”的位置：d^2 恰好等于 (r1+r2)^2，"
-                          "返回的仍是不碰！",
-                          20);
+                          "方向键移动绿圆慢慢靠近灰圆——真正压上才会变红。", 20);
+            bgt_draw_text(
+                40, 162,
+                "试试停在“看起来刚碰上”的位置：d^2 恰好等于 (r1+r2)^2，"
+                "返回的仍是不碰！",
+                20);
 
             /// 固定大圆
             bgt_set_color(BGT_DARK_GRAY);
@@ -391,8 +390,8 @@ int main()
             }
             else {
                 std::snprintf(dist_text, sizeof(dist_text),
-                              "d^2 = %d > (r1+r2)^2 = %d —— 还没碰上",
-                              dist_sq, radius_sum * radius_sum);
+                              "d^2 = %d > (r1+r2)^2 = %d —— 还没碰上", dist_sq,
+                              radius_sum * radius_sum);
                 bgt_set_color(BGT_BLACK);
             }
             bgt_draw_text(40, 596, dist_text, 20);
@@ -419,9 +418,8 @@ int main()
                 puck_y = window_height - puck_r;
             }
 
-            const bool hit = bgt_hit_circle_rect(puck_x, puck_y, puck_r,
-                                                 paddle_x, paddle_y,
-                                                 paddle_w, paddle_h);
+            const bool hit = bgt_hit_circle_rect(
+                puck_x, puck_y, puck_r, paddle_x, paddle_y, paddle_w, paddle_h);
 
             bgt_set_color(BGT_BLACK);
             bgt_draw_text(40, 36, "板块 5：圆与矩形 —— “球拍”原型", 32);
@@ -434,8 +432,7 @@ int main()
                           "擦到不算。",
                           20);
             bgt_draw_text(40, 162,
-                          "这就是球类游戏里“球撞挡板”的判断原型（Pong）。",
-                          20);
+                          "这就是球类游戏里“球撞挡板”的判断原型（Pong）。", 20);
 
             /// 挡板
             bgt_set_color(BGT_DARK_GRAY);
@@ -458,13 +455,12 @@ int main()
             char puck_text[128];
             if (hit) {
                 std::snprintf(puck_text, sizeof(puck_text),
-                              "圆心：(%d, %d) —— 圆与挡板重叠：命中！",
-                              puck_x, puck_y);
+                              "圆心：(%d, %d) —— 圆与挡板重叠：命中！", puck_x,
+                              puck_y);
             }
             else {
                 std::snprintf(puck_text, sizeof(puck_text),
-                              "圆心：(%d, %d) —— 没有重叠",
-                              puck_x, puck_y);
+                              "圆心：(%d, %d) —— 没有重叠", puck_x, puck_y);
             }
             bgt_set_color(BGT_BLACK);
             bgt_draw_text(40, 596, puck_text, 20);

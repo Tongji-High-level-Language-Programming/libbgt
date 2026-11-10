@@ -32,13 +32,13 @@ int g_failed_checks = 0;
 /**
  * @brief 显式检查宏：失败时打印表达式与位置，任何构建配置下都生效。
  */
-#define BGT_CHECK(condition)                                            \
-    do {                                                                \
-        if (!(condition)) {                                             \
-            std::fprintf(stderr, "FAILED: %s (%s:%d)\n", #condition,    \
-                         __FILE__, __LINE__);                           \
-            g_failed_checks = g_failed_checks + 1;                      \
-        }                                                               \
+#define BGT_CHECK(condition)                                                   \
+    do {                                                                       \
+        if (!(condition)) {                                                    \
+            std::fprintf(stderr, "FAILED: %s (%s:%d)\n", #condition, __FILE__, \
+                         __LINE__);                                            \
+            g_failed_checks = g_failed_checks + 1;                             \
+        }                                                                      \
     } while (false)
 
 /**
@@ -64,11 +64,14 @@ std::size_t utf8_char_count(const std::string &text)
         const auto byte = static_cast<unsigned char>(text[index]);
         if ((byte & 0xF8U) == 0xF0U) {
             index += 4;
-        } else if ((byte & 0xF0U) == 0xE0U) {
+        }
+        else if ((byte & 0xF0U) == 0xE0U) {
             index += 3;
-        } else if ((byte & 0xE0U) == 0xC0U) {
+        }
+        else if ((byte & 0xE0U) == 0xC0U) {
             index += 2;
-        } else {
+        }
+        else {
             index += 1;
         }
         count += 1;
@@ -82,8 +85,8 @@ std::size_t utf8_char_count(const std::string &text)
 void check_codec()
 {
     /// 同编码之间永远是恒等转换，任何平台、任何模式都成立。
-    BGT_CHECK(bgt::convert("abc", bgt::Encoding::Utf8,
-                           bgt::Encoding::Utf8) == "abc");
+    BGT_CHECK(bgt::convert("abc", bgt::Encoding::Utf8, bgt::Encoding::Utf8) ==
+              "abc");
 
     if constexpr (!bgt::kHasGbkCodec) {
         return; ///< 没有 GBK 后端（非 Windows）时只验证恒等路径
@@ -120,8 +123,7 @@ void check_codec()
     /// 非法（截断的）UTF-8 输入在严格模式下失败，宽松模式下不崩。
     BGT_CHECK(!bgt::convert_strict("\xE4\xBD", bgt::Encoding::Utf8,
                                    bgt::Encoding::Gbk, strict_out));
-    BGT_CHECK(bgt::convert("\xE4\xBD", bgt::Encoding::Utf8,
-                           bgt::Encoding::Gbk)
+    BGT_CHECK(bgt::convert("\xE4\xBD", bgt::Encoding::Utf8, bgt::Encoding::Gbk)
                   .size() <= 2);
 }
 
@@ -141,7 +143,8 @@ void check_string_helpers()
     BGT_CHECK(bgt::encoded_prefix_length("abcd", 0) == 0);
 
     /// GBK 尾字节陷阱：0x82 0x5B 在 GBK 下是一个合法汉字（U+8949），尾字节恰好
-    /// 是 '['；0x82 0x5D 同理（U+8A2D，尾字节 ']'）。老实现用 find('[') 会误判，
+    /// 是 '['；0x82 0x5D 同理（U+8A2D，尾字节 ']'）。老实现用 find('[')
+    /// 会误判，
     /// 按字符边界搜索才不会。这里的字节写死，避免依赖编译器对字面量的转码方式。
     if constexpr (bgt::kSourceEncoding == bgt::Encoding::Gbk) {
         const std::string trail_lb = "\x82\x5B";
@@ -150,13 +153,14 @@ void check_string_helpers()
         BGT_CHECK(!bgt::encoded_contains_ascii(trail_rb, ']'));
         BGT_CHECK(!bgt::encoded_ends_with_ascii(trail_rb, ']'));
         /// 确认这两个字节确实是合法（可解码的）汉字，而不是被当成了非法序列。
-        BGT_CHECK(bgt::convert(trail_lb, bgt::Encoding::Gbk,
-                               bgt::Encoding::Utf8)
-                      .size() == 3);
-        BGT_CHECK(bgt::convert(trail_rb, bgt::Encoding::Gbk,
-                               bgt::Encoding::Utf8)
-                      .size() == 3);
-    } else {
+        BGT_CHECK(
+            bgt::convert(trail_lb, bgt::Encoding::Gbk, bgt::Encoding::Utf8)
+                .size() == 3);
+        BGT_CHECK(
+            bgt::convert(trail_rb, bgt::Encoding::Gbk, bgt::Encoding::Utf8)
+                .size() == 3);
+    }
+    else {
         /// UTF-8 的多字节字符不会与 ASCII 混淆（续字节永远 >= 0x80）。
         const std::string hanzi = "\xE8\xA5\x89"; ///< U+8949 的 UTF-8 字节
         BGT_CHECK(!bgt::encoded_contains_ascii(hanzi, '['));
@@ -191,7 +195,8 @@ void check_native_path()
     BGT_CHECK(std::filesystem::file_size(native) == 3);
     std::filesystem::remove(native, error);
     BGT_CHECK(!std::filesystem::exists(native));
-    BGT_CHECK(!std::filesystem::exists(bgt::to_native_path("bgt_不存在的文件.txt")));
+    BGT_CHECK(
+        !std::filesystem::exists(bgt::to_native_path("bgt_不存在的文件.txt")));
 
     /// 端到端：公开 API 用中文文件名写读存档（内部走 `to_native_path`）。
     bgt_clear_error();

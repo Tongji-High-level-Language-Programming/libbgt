@@ -18,9 +18,9 @@
 #include "bgt_encoding.h"
 
 #include <SDL3/SDL.h>
-#include <SDL3_ttf/SDL_ttf.h>
 #include <SDL3_image/SDL_image.h>
 #include <SDL3_mixer/SDL_mixer.h>
+#include <SDL3_ttf/SDL_ttf.h>
 
 #include <algorithm>
 #include <array>
@@ -57,7 +57,7 @@ constexpr int kMouseButtonCount = 4;
  * @brief 默认字号（像素）。
  */
 constexpr int kDefaultFontSize = 24;
-constexpr int kSuperSample = 2;  ///< SSAA 倍率（画布是逻辑尺寸的这么多倍）。
+constexpr int kSuperSample = 2; ///< SSAA 倍率（画布是逻辑尺寸的这么多倍）。
 /**
  * @brief 统计帧率的时间窗口（秒）。
  */
@@ -71,17 +71,17 @@ constexpr double kTwoPi = 6.28318530717958647692;
  * @brief 字体缓存条目：字体文件路径 + 字号 + 已打开的 TTF 字体句柄。
  */
 struct FontEntry {
-    std::string path;             ///< 字体文件路径（源编码）。
-    int size = kDefaultFontSize;  ///< 字号（像素）。
-    TTF_Font *font = nullptr;     ///< 已打开的字体句柄；由库统一关闭。
+    std::string path;            ///< 字体文件路径（源编码）。
+    int size = kDefaultFontSize; ///< 字号（像素）。
+    TTF_Font *font = nullptr;    ///< 已打开的字体句柄；由库统一关闭。
 };
 
 /**
  * @brief 整数点坐标，用于整数几何计算（如三角形朝向判断）。
  */
 struct Point {
-    int x = 0;  ///< x 坐标。
-    int y = 0;  ///< y 坐标。
+    int x = 0; ///< x 坐标。
+    int y = 0; ///< y 坐标。
 };
 
 /**
@@ -90,28 +90,28 @@ struct Point {
  * 变换合成顺序固定为 M = T * R * S（先 S 后 R 后 T），全部围绕局部原点。
  */
 struct ImageEntry {
-    SDL_Texture *texture = nullptr;  ///< 解码后的纹理；由库统一销毁。
-    double rotation = 0.0;           ///< R：旋转角（度，顺时针）。
-    double scale_x = 1.0;            ///< S：横向缩放因子（负值 = 左右翻转）。
-    double scale_y = 1.0;            ///< S：纵向缩放因子（负值 = 上下翻转）。
-    int offset_x = 0;                ///< T：相对绘制位置的横向偏移。
-    int offset_y = 0;                ///< T：相对绘制位置的纵向偏移。
+    SDL_Texture *texture = nullptr; ///< 解码后的纹理；由库统一销毁。
+    double rotation = 0.0;          ///< R：旋转角（度，顺时针）。
+    double scale_x = 1.0;           ///< S：横向缩放因子（负值 = 左右翻转）。
+    double scale_y = 1.0;           ///< S：纵向缩放因子（负值 = 上下翻转）。
+    int offset_x = 0;               ///< T：相对绘制位置的横向偏移。
+    int offset_y = 0;               ///< T：相对绘制位置的纵向偏移。
 };
 
 /**
  * @brief 一段已加载的音效：解码句柄 + 学生设置的音量（0-100）。
  */
 struct SoundEntry {
-    MIX_Audio *audio = nullptr;  ///< 解码后的音频数据；由库统一销毁。
-    int volume = 100;            ///< 学生设置的音量（0-100）。
+    MIX_Audio *audio = nullptr; ///< 解码后的音频数据；由库统一销毁。
+    int volume = 100;           ///< 学生设置的音量（0-100）。
 };
 
 /**
  * @brief 错误历史条目：错误码 + 完整消息（已拼好 SDL 原文后缀）。
  */
 struct ErrorEntry {
-    int code = BGT_ERROR_NONE;  ///< 错误码（`BGT_ERROR_*` 常量）。
-    std::string message;        ///< 完整消息（源编码，已拼上 SDL 原文后缀）。
+    int code = BGT_ERROR_NONE; ///< 错误码（`BGT_ERROR_*` 常量）。
+    std::string message;       ///< 完整消息（源编码，已拼上 SDL 原文后缀）。
 };
 
 /**
@@ -127,49 +127,50 @@ constexpr int kMaxErrorHistory = 10;
  * 释放全部 SDL 资源并把它恢复到未打开状态。
  */
 struct State {
-    SDL_Window *window = nullptr;        ///< SDL 窗口；未打开时为 nullptr。
-    SDL_Renderer *renderer = nullptr;    ///< SDL 渲染器；未打开时为 nullptr。
-    bool sdl_ready = false;              ///< SDL_Init() 是否成功（关闭时 Quit）。
-    bool ttf_ready = false;              ///< TTF_Init() 是否成功（关闭时 Quit）。
-    bool open = false;                   ///< 窗口是否已成功创建并处于打开状态。
-    bool closing = false;                ///< 是否已收到退出/关闭事件。
-    int width = 0;                       ///< 逻辑绘图宽度（像素）。
-    int height = 0;                      ///< 逻辑绘图高度（像素）。
-    unsigned color = BGT_WHITE;          ///< 当前绘图颜色。
-    unsigned background = BGT_BLACK;     ///< 画布背景色。
-    int line_width = 1;                  ///< 当前线宽（像素，至少为 1）。
-    int font_size = kDefaultFontSize;    ///< 当前默认字号（像素）。
-    int fps_limit = 0;                   ///< 帧率上限；<= 0 表示不限制。
-    std::string font_path;               ///< 当前字体文件路径（源编码）。
-    std::vector<FontEntry> fonts;        ///< 已打开字体的缓存。
-    std::vector<ImageEntry> images;      ///< 图片条目，编号 = 下标 + 1。
-    std::array<bool, kMaxPublicKey> keys{};  ///< 本帧按键状态。
-    std::array<bool, kMaxPublicKey> previous_keys{};  ///< 上一帧按键状态。
-    std::array<bool, kMouseButtonCount> mouse_buttons{};  ///< 本帧鼠标按键。
-    std::array<bool, kMouseButtonCount> previous_mouse_buttons{};  ///< 上一帧鼠标键。
-    int mouse_x = 0;                     ///< 鼠标 x 坐标（逻辑坐标）。
-    int mouse_y = 0;                     ///< 鼠标 y 坐标（逻辑坐标）。
-    int mouse_wheel = 0;                 ///< 本帧鼠标滚轮滚动量。
-    SDL_Texture *canvas = nullptr;       ///< SSAA 离屏纹理（2 倍分辨率）。
-    std::uint64_t start_ticks = 0;       ///< 窗口创建时刻（毫秒）。
-    std::uint64_t previous_ticks = 0;    ///< 上一帧时刻（毫秒）。
-    std::uint64_t fps_ticks = 0;         ///< 本次帧率统计窗口起点（毫秒）。
-    int fps_frames = 0;                  ///< 本次帧率统计窗口内的帧数。
-    std::uint64_t next_frame_ns = 0;     ///< 下一帧的目标时刻（纳秒）。
-    double delta_time = 0.0;             ///< 上一帧到当前帧的秒数。
-    double total_time = 0.0;             ///< 窗口创建以来的总秒数。
-    double fps = 0.0;                    ///< 最近统计到的帧率。
+    SDL_Window *window = nullptr;     ///< SDL 窗口；未打开时为 nullptr。
+    SDL_Renderer *renderer = nullptr; ///< SDL 渲染器；未打开时为 nullptr。
+    bool sdl_ready = false;           ///< SDL_Init() 是否成功（关闭时 Quit）。
+    bool ttf_ready = false;           ///< TTF_Init() 是否成功（关闭时 Quit）。
+    bool open = false;                ///< 窗口是否已成功创建并处于打开状态。
+    bool closing = false;             ///< 是否已收到退出/关闭事件。
+    int width = 0;                    ///< 逻辑绘图宽度（像素）。
+    int height = 0;                   ///< 逻辑绘图高度（像素）。
+    unsigned color = BGT_WHITE;       ///< 当前绘图颜色。
+    unsigned background = BGT_BLACK;  ///< 画布背景色。
+    int line_width = 1;               ///< 当前线宽（像素，至少为 1）。
+    int font_size = kDefaultFontSize; ///< 当前默认字号（像素）。
+    int fps_limit = 0;                ///< 帧率上限；<= 0 表示不限制。
+    std::string font_path;            ///< 当前字体文件路径（源编码）。
+    std::vector<FontEntry> fonts;     ///< 已打开字体的缓存。
+    std::vector<ImageEntry> images;   ///< 图片条目，编号 = 下标 + 1。
+    std::array<bool, kMaxPublicKey> keys{};              ///< 本帧按键状态。
+    std::array<bool, kMaxPublicKey> previous_keys{};     ///< 上一帧按键状态。
+    std::array<bool, kMouseButtonCount> mouse_buttons{}; ///< 本帧鼠标按键。
+    std::array<bool, kMouseButtonCount>
+        previous_mouse_buttons{};     ///< 上一帧鼠标键。
+    int mouse_x = 0;                  ///< 鼠标 x 坐标（逻辑坐标）。
+    int mouse_y = 0;                  ///< 鼠标 y 坐标（逻辑坐标）。
+    int mouse_wheel = 0;              ///< 本帧鼠标滚轮滚动量。
+    SDL_Texture *canvas = nullptr;    ///< SSAA 离屏纹理（2 倍分辨率）。
+    std::uint64_t start_ticks = 0;    ///< 窗口创建时刻（毫秒）。
+    std::uint64_t previous_ticks = 0; ///< 上一帧时刻（毫秒）。
+    std::uint64_t fps_ticks = 0;      ///< 本次帧率统计窗口起点（毫秒）。
+    int fps_frames = 0;               ///< 本次帧率统计窗口内的帧数。
+    std::uint64_t next_frame_ns = 0;  ///< 下一帧的目标时刻（纳秒）。
+    double delta_time = 0.0;          ///< 上一帧到当前帧的秒数。
+    double total_time = 0.0;          ///< 窗口创建以来的总秒数。
+    double fps = 0.0;                 ///< 最近统计到的帧率。
     /// v0.3 存档表：节名 → 键名 → 值的文本形式。
     std::map<std::string, std::map<std::string, std::string>> storage;
 
     /// v0.3 声音：SDL_mixer 句柄、音效表与音乐单实例。
-    MIX_Mixer *audio_mixer = nullptr;       ///< 懒初始化，见 `ensure_audio()`。
-    std::map<int, SoundEntry> sounds;       ///< 音效 ID → 数据。
-    int next_sound_id = 1;                  ///< 下一个音效 ID；0 保留为“无效 ID”。
-    std::vector<MIX_Track *> sound_tracks;  ///< 音效轨道池（可重叠播放）。
-    MIX_Track *music_track = nullptr;       ///< 背景音乐全局单实例。
-    int music_volume = 100;                 ///< 0-100；无实例时记忆。
-    std::deque<ErrorEntry> errors;          ///< 错误历史，最多 kMaxErrorHistory 条。
+    MIX_Mixer *audio_mixer = nullptr; ///< 懒初始化，见 `ensure_audio()`。
+    std::map<int, SoundEntry> sounds; ///< 音效 ID → 数据。
+    int next_sound_id = 1;            ///< 下一个音效 ID；0 保留为“无效 ID”。
+    std::vector<MIX_Track *> sound_tracks; ///< 音效轨道池（可重叠播放）。
+    MIX_Track *music_track = nullptr;      ///< 背景音乐全局单实例。
+    int music_volume = 100;                ///< 0-100；无实例时记忆。
+    std::deque<ErrorEntry> errors; ///< 错误历史，最多 kMaxErrorHistory 条。
 
     ~State()
     {
@@ -326,8 +327,8 @@ int clamp_byte(int value)
  */
 std::uint8_t color_a(unsigned color)
 {
-    return static_cast<std::uint8_t>((static_cast<std::uint32_t>(color) >> 24U) &
-                                     0xFFU);
+    return static_cast<std::uint8_t>(
+        (static_cast<std::uint32_t>(color) >> 24U) & 0xFFU);
 }
 
 /**
@@ -830,8 +831,9 @@ void apply_fps_limit(State &s)
         s.next_frame_ns = 0;
         return;
     }
-    const std::uint64_t period_ns = static_cast<std::uint64_t>(SDL_NS_PER_SECOND)
-        / static_cast<std::uint64_t>(s.fps_limit);
+    const std::uint64_t period_ns =
+        static_cast<std::uint64_t>(SDL_NS_PER_SECOND) /
+        static_cast<std::uint64_t>(s.fps_limit);
     const std::uint64_t now = SDL_GetTicksNS();
 
     if (s.next_frame_ns == 0) {
@@ -849,7 +851,6 @@ void apply_fps_limit(State &s)
     }
     s.next_frame_ns += period_ns;
 }
-
 
 /**
  * @brief 用 UTF-8 文本在离屏画布上绘制一行文字。
@@ -951,8 +952,8 @@ int edge_value(const Point &a, const Point &b, const Point &p)
  * @brief 双精度点坐标，用于几何计算与顶点偏移。
  */
 struct PointD {
-    double x = 0.0;  ///< x 坐标。
-    double y = 0.0;  ///< y 坐标。
+    double x = 0.0; ///< x 坐标。
+    double y = 0.0; ///< y 坐标。
 };
 
 /**
@@ -986,8 +987,8 @@ void fill_convex_polygon(State &s, const PointD *pts, int count)
     if (count < 3) {
         return;
     }
-    SDL_Vertex *vertices = static_cast<SDL_Vertex *>(
-        SDL_stack_alloc(SDL_Vertex, count));
+    SDL_Vertex *vertices =
+        static_cast<SDL_Vertex *>(SDL_stack_alloc(SDL_Vertex, count));
     const SDL_Color col = to_sdl_color(s.color);
     const float inv255 = 1.0F / 255.0F;
     for (int i = 0; i < count; ++i) {
@@ -1071,9 +1072,9 @@ bool open_window_impl(int width, int height, const char title[],
 
     /// SSAA：创建 2x 分辨率的离屏纹理作为画布，所有绘制画到它上面，
     /// `bgt_update_window()` 时线性缩放到窗口，实现全场景抗锯齿。
-    s.canvas = SDL_CreateTexture(
-        s.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET,
-        width * kSuperSample, height * kSuperSample);
+    s.canvas = SDL_CreateTexture(s.renderer, SDL_PIXELFORMAT_ARGB8888,
+                                 SDL_TEXTUREACCESS_TARGET, width * kSuperSample,
+                                 height * kSuperSample);
     if (s.canvas == nullptr) {
         s.set_error(BGT_ERROR_RENDERER, "failed to create SSAA canvas");
         s.close();
@@ -1084,8 +1085,8 @@ bool open_window_impl(int width, int height, const char title[],
     /// 先切到画布，再设逻辑坐标：logical presentation 绑定在当前 render
     /// target 上，这样 800×600 的逻辑坐标会映射到画布的 1600×1200 像素。
     SDL_SetRenderTarget(s.renderer, nullptr);
-    SDL_SetRenderLogicalPresentation(
-        s.renderer, width, height, SDL_LOGICAL_PRESENTATION_STRETCH);
+    SDL_SetRenderLogicalPresentation(s.renderer, width, height,
+                                     SDL_LOGICAL_PRESENTATION_STRETCH);
 
     SDL_SetRenderTarget(s.renderer, s.canvas);
     SDL_SetRenderLogicalPresentation(s.renderer, width, height,
@@ -1257,9 +1258,11 @@ void bgt_draw_line(int x1, int y1, int x2, int y2)
 
     if (s.line_width <= 1) {
         /// 1px 线：SSAA 已提供全场景抗锯齿，直接用 `SDL_RenderLine`。
-        SDL_RenderLine(s.renderer, static_cast<float>(x1), static_cast<float>(y1),
-                       static_cast<float>(x2), static_cast<float>(y2));
-    } else {
+        SDL_RenderLine(s.renderer, static_cast<float>(x1),
+                       static_cast<float>(y1), static_cast<float>(x2),
+                       static_cast<float>(y2));
+    }
+    else {
         /// 粗线：沿垂直方向偏移 `SDL_RenderLine`，避免多条 AA 线叠加导致的
         /// 颜色不均和端点突出。
         const double dx = static_cast<double>(x2 - x1);
@@ -1268,7 +1271,8 @@ void bgt_draw_line(int x1, int y1, int x2, int y2)
         if (length < 0.5) {
             const int half = s.line_width / 2;
             bgt_fill_rect(x1 - half, y1 - half, s.line_width, s.line_width);
-        } else {
+        }
+        else {
             const double px = -dy / length;
             const double py = dx / length;
             /// 浮点偏移：偶数线宽时也精确（如 width=2 → off=-0.5, +0.5）。
@@ -1301,10 +1305,12 @@ void bgt_draw_rect(int x, int y, int width, int height)
     }
 
     /// 四条边互不重叠：上下画满宽，左右只填中间部分。
-    bgt_fill_rect(x, y, width, line_width);  ///< 上
-    bgt_fill_rect(x, y + height - line_width, width, line_width);  ///< 下
-    bgt_fill_rect(x, y + line_width, line_width, height - 2 * line_width);  ///< 左
-    bgt_fill_rect(x + width - line_width, y + line_width, line_width, height - 2 * line_width);  ///< 右
+    bgt_fill_rect(x, y, width, line_width);                       ///< 上
+    bgt_fill_rect(x, y + height - line_width, width, line_width); ///< 下
+    bgt_fill_rect(x, y + line_width, line_width,
+                  height - 2 * line_width); ///< 左
+    bgt_fill_rect(x + width - line_width, y + line_width, line_width,
+                  height - 2 * line_width); ///< 右
 }
 
 void bgt_fill_rect(int x, int y, int width, int height)
@@ -1340,30 +1346,35 @@ void bgt_draw_circle(int x, int y, int radius)
         while (dx >= dy) {
             const bool diag = (dx == dy);
             circle_pts.push_back(SDL_FPoint{static_cast<float>(x + dx),
-                                             static_cast<float>(y + dy)});
+                                            static_cast<float>(y + dy)});
             circle_pts.push_back(SDL_FPoint{static_cast<float>(x - dx),
-                                             static_cast<float>(y - dy)});
+                                            static_cast<float>(y - dy)});
             if (dy != 0) {
                 circle_pts.push_back(SDL_FPoint{static_cast<float>(x - dx),
-                                                 static_cast<float>(y + dy)});
+                                                static_cast<float>(y + dy)});
                 circle_pts.push_back(SDL_FPoint{static_cast<float>(x + dx),
-                                                 static_cast<float>(y - dy)});
+                                                static_cast<float>(y - dy)});
             }
             if (!diag) {
                 if (dy != 0) {
-                    circle_pts.push_back(SDL_FPoint{static_cast<float>(x + dy),
-                                                     static_cast<float>(y + dx)});
-                    circle_pts.push_back(SDL_FPoint{static_cast<float>(x - dy),
-                                                     static_cast<float>(y + dx)});
-                    circle_pts.push_back(SDL_FPoint{static_cast<float>(x - dy),
-                                                     static_cast<float>(y - dx)});
-                    circle_pts.push_back(SDL_FPoint{static_cast<float>(x + dy),
-                                                     static_cast<float>(y - dx)});
-                } else {
-                    circle_pts.push_back(SDL_FPoint{static_cast<float>(x),
-                                                     static_cast<float>(y + dx)});
-                    circle_pts.push_back(SDL_FPoint{static_cast<float>(x),
-                                                     static_cast<float>(y - dx)});
+                    circle_pts.push_back(
+                        SDL_FPoint{static_cast<float>(x + dy),
+                                   static_cast<float>(y + dx)});
+                    circle_pts.push_back(
+                        SDL_FPoint{static_cast<float>(x - dy),
+                                   static_cast<float>(y + dx)});
+                    circle_pts.push_back(
+                        SDL_FPoint{static_cast<float>(x - dy),
+                                   static_cast<float>(y - dx)});
+                    circle_pts.push_back(
+                        SDL_FPoint{static_cast<float>(x + dy),
+                                   static_cast<float>(y - dx)});
+                }
+                else {
+                    circle_pts.push_back(SDL_FPoint{
+                        static_cast<float>(x), static_cast<float>(y + dx)});
+                    circle_pts.push_back(SDL_FPoint{
+                        static_cast<float>(x), static_cast<float>(y - dx)});
                 }
             }
             ++dy;
@@ -1377,40 +1388,41 @@ void bgt_draw_circle(int x, int y, int radius)
         }
         SDL_RenderPoints(s.renderer, circle_pts.data(),
                          static_cast<int>(circle_pts.size()));
-    } else if (inner_r <= 0) {
+    }
+    else if (inner_r <= 0) {
         /// 线宽 >= 半径：填充整个外圆。
         bgt_fill_circle(x, y, outer_r);
-    } else {
+    }
+    else {
         /// 粗线：扫描线填充环形区域（外圆 - 内圆），无间隙。
         const int row_count = 2 * outer_r + 1;
-        SDL_FRect *rects = static_cast<SDL_FRect *>(
-            SDL_stack_alloc(SDL_FRect, row_count * 2));
+        SDL_FRect *rects =
+            static_cast<SDL_FRect *>(SDL_stack_alloc(SDL_FRect, row_count * 2));
         int idx = 0;
         for (int dy = -outer_r; dy <= outer_r; ++dy) {
             const double oy = static_cast<double>(dy) / outer_r;
-            const int outer_span = static_cast<int>(std::lround(
-                outer_r * std::sqrt(1.0 - oy * oy)));
+            const int outer_span = static_cast<int>(
+                std::lround(outer_r * std::sqrt(1.0 - oy * oy)));
             if (std::abs(dy) <= inner_r) {
                 const double iy = static_cast<double>(dy) / inner_r;
-                const int inner_span = static_cast<int>(std::lround(
-                    inner_r * std::sqrt(1.0 - iy * iy)));
+                const int inner_span = static_cast<int>(
+                    std::lround(inner_r * std::sqrt(1.0 - iy * iy)));
                 const int left_w = outer_span - inner_span;
                 /// 左半环。
-                rects[idx++] = SDL_FRect{
-                    static_cast<float>(x - outer_span),
-                    static_cast<float>(y + dy),
-                    static_cast<float>(left_w), 1.0F};
+                rects[idx++] = SDL_FRect{static_cast<float>(x - outer_span),
+                                         static_cast<float>(y + dy),
+                                         static_cast<float>(left_w), 1.0F};
                 /// 右半环（+1 跳过内圆占据的中心列）。
-                rects[idx++] = SDL_FRect{
-                    static_cast<float>(x + inner_span + 1),
-                    static_cast<float>(y + dy),
-                    static_cast<float>(left_w), 1.0F};
-            } else {
+                rects[idx++] = SDL_FRect{static_cast<float>(x + inner_span + 1),
+                                         static_cast<float>(y + dy),
+                                         static_cast<float>(left_w), 1.0F};
+            }
+            else {
                 /// 内圆不覆盖此行：整行都是环。
-                rects[idx++] = SDL_FRect{
-                    static_cast<float>(x - outer_span),
-                    static_cast<float>(y + dy),
-                    static_cast<float>(2 * outer_span + 1), 1.0F};
+                rects[idx++] =
+                    SDL_FRect{static_cast<float>(x - outer_span),
+                              static_cast<float>(y + dy),
+                              static_cast<float>(2 * outer_span + 1), 1.0F};
             }
         }
         SDL_RenderFillRects(s.renderer, rects, idx);
@@ -1426,17 +1438,17 @@ void bgt_fill_circle(int x, int y, int radius)
     }
     apply_render_color(s, s.color);
     const int row_count = 2 * radius + 1;
-    SDL_FRect *rects = static_cast<SDL_FRect *>(
-        SDL_stack_alloc(SDL_FRect, row_count));
+    SDL_FRect *rects =
+        static_cast<SDL_FRect *>(SDL_stack_alloc(SDL_FRect, row_count));
     int idx = 0;
     for (int dy = -radius; dy <= radius; ++dy) {
         const double normalized_y =
             static_cast<double>(dy) / static_cast<double>(radius);
         const int span = static_cast<int>(std::lround(
             radius * std::sqrt(1.0 - (normalized_y * normalized_y))));
-        rects[idx++] = SDL_FRect{
-            static_cast<float>(x - span), static_cast<float>(y + dy),
-            static_cast<float>(2 * span + 1), 1.0F};
+        rects[idx++] =
+            SDL_FRect{static_cast<float>(x - span), static_cast<float>(y + dy),
+                      static_cast<float>(2 * span + 1), 1.0F};
     }
     SDL_RenderFillRects(s.renderer, rects, row_count);
     SDL_stack_free(rects);
@@ -1455,18 +1467,20 @@ void bgt_draw_ellipse(int x, int y, int radius_x, int radius_y)
         /// 1px：采样折线，一次 `SDL_RenderLines` 绘制。
         const int steps = std::max(24, (radius_x + radius_y) * 3);
         const int pt_count = steps + 1;
-        SDL_FPoint *pts = static_cast<SDL_FPoint *>(
-            SDL_stack_alloc(SDL_FPoint, pt_count));
+        SDL_FPoint *pts =
+            static_cast<SDL_FPoint *>(SDL_stack_alloc(SDL_FPoint, pt_count));
         for (int step = 0; step <= steps; ++step) {
-            const double angle =
-                (static_cast<double>(step) * kTwoPi) / static_cast<double>(steps);
+            const double angle = (static_cast<double>(step) * kTwoPi) /
+                                 static_cast<double>(steps);
             pts[step] = SDL_FPoint{
                 static_cast<float>(x + std::lround(std::cos(angle) * radius_x)),
-                static_cast<float>(y + std::lround(std::sin(angle) * radius_y))};
+                static_cast<float>(y +
+                                   std::lround(std::sin(angle) * radius_y))};
         }
         SDL_RenderLines(s.renderer, pts, pt_count);
         SDL_stack_free(pts);
-    } else {
+    }
+    else {
         /// 粗线：扫描线填充环形区域（外椭圆 - 内椭圆），无间隙。
         const int outer_rx = radius_x + (line_width + 1) / 2;
         const int outer_ry = radius_y + (line_width + 1) / 2;
@@ -1481,33 +1495,33 @@ void bgt_draw_ellipse(int x, int y, int radius_x, int radius_y)
 
         const int row_count = 2 * outer_ry + 1;
         /// 每行最多 2 个 rect（左半环 + 右半环）。
-        SDL_FRect *rects = static_cast<SDL_FRect *>(
-            SDL_stack_alloc(SDL_FRect, row_count * 2));
+        SDL_FRect *rects =
+            static_cast<SDL_FRect *>(SDL_stack_alloc(SDL_FRect, row_count * 2));
         int idx = 0;
         for (int dy = -outer_ry; dy <= outer_ry; ++dy) {
             const double oy = static_cast<double>(dy) / outer_ry;
-            const int outer_span = static_cast<int>(std::lround(
-                outer_rx * std::sqrt(1.0 - oy * oy)));
+            const int outer_span = static_cast<int>(
+                std::lround(outer_rx * std::sqrt(1.0 - oy * oy)));
             if (std::abs(dy) <= inner_ry) {
                 const double iy = static_cast<double>(dy) / inner_ry;
-                const int inner_span = static_cast<int>(std::lround(
-                    inner_rx * std::sqrt(1.0 - iy * iy)));
+                const int inner_span = static_cast<int>(
+                    std::lround(inner_rx * std::sqrt(1.0 - iy * iy)));
                 const int left_w = outer_span - inner_span;
                 if (left_w > 0) {
-                    rects[idx++] = SDL_FRect{
-                        static_cast<float>(x - outer_span),
-                        static_cast<float>(y + dy),
-                        static_cast<float>(left_w), 1.0F};
-                    rects[idx++] = SDL_FRect{
-                        static_cast<float>(x + inner_span + 1),
-                        static_cast<float>(y + dy),
-                        static_cast<float>(left_w), 1.0F};
+                    rects[idx++] = SDL_FRect{static_cast<float>(x - outer_span),
+                                             static_cast<float>(y + dy),
+                                             static_cast<float>(left_w), 1.0F};
+                    rects[idx++] =
+                        SDL_FRect{static_cast<float>(x + inner_span + 1),
+                                  static_cast<float>(y + dy),
+                                  static_cast<float>(left_w), 1.0F};
                 }
-            } else {
-                rects[idx++] = SDL_FRect{
-                    static_cast<float>(x - outer_span),
-                    static_cast<float>(y + dy),
-                    static_cast<float>(2 * outer_span + 1), 1.0F};
+            }
+            else {
+                rects[idx++] =
+                    SDL_FRect{static_cast<float>(x - outer_span),
+                              static_cast<float>(y + dy),
+                              static_cast<float>(2 * outer_span + 1), 1.0F};
             }
         }
         SDL_RenderFillRects(s.renderer, rects, idx);
@@ -1523,17 +1537,17 @@ void bgt_fill_ellipse(int x, int y, int radius_x, int radius_y)
     }
     apply_render_color(s, s.color);
     const int row_count = 2 * radius_y + 1;
-    SDL_FRect *rects = static_cast<SDL_FRect *>(
-        SDL_stack_alloc(SDL_FRect, row_count));
+    SDL_FRect *rects =
+        static_cast<SDL_FRect *>(SDL_stack_alloc(SDL_FRect, row_count));
     int idx = 0;
     for (int dy = -radius_y; dy <= radius_y; ++dy) {
         const double normalized_y =
             static_cast<double>(dy) / static_cast<double>(radius_y);
         const int span = static_cast<int>(std::lround(
             radius_x * std::sqrt(1.0 - (normalized_y * normalized_y))));
-        rects[idx++] = SDL_FRect{
-            static_cast<float>(x - span), static_cast<float>(y + dy),
-            static_cast<float>(2 * span + 1), 1.0F};
+        rects[idx++] =
+            SDL_FRect{static_cast<float>(x - span), static_cast<float>(y + dy),
+                      static_cast<float>(2 * span + 1), 1.0F};
     }
     SDL_RenderFillRects(s.renderer, rects, row_count);
     SDL_stack_free(rects);
@@ -1556,7 +1570,8 @@ void bgt_draw_triangle(int x1, int y1, int x2, int y2, int x3, int y3)
             {static_cast<float>(x1), static_cast<float>(y1)},
         };
         SDL_RenderLines(s.renderer, tri_pts, 4);
-    } else {
+    }
+    else {
         /// 粗线：miter join —— 算出 6 个偏移顶点，填充 3 条边的矩形带。
         const double p1x = static_cast<double>(x1);
         const double p1y = static_cast<double>(y1);
@@ -1598,11 +1613,11 @@ void bgt_draw_triangle(int x1, int y1, int x2, int y2, int x3, int y3)
 
         /// 三条边的垂直方向（单位法向量）。
         const double n1x = -e1y / len1;
-        const double n1y =  e1x / len1;
+        const double n1y = e1x / len1;
         const double n2x = -e2y / len2;
-        const double n2y =  e2x / len2;
+        const double n2y = e2x / len2;
         const double n3x = -e3y / len3;
-        const double n3y =  e3x / len3;
+        const double n3y = e3x / len3;
 
         const double half = static_cast<double>(s.line_width) / 2.0;
 
@@ -1625,18 +1640,12 @@ void bgt_draw_triangle(int x1, int y1, int x2, int y2, int x3, int y3)
         const double i3py = p3y - n3y * half;
 
         PointD pts[6];
-        pts[0] = line_intersection(o3px, o3py, e3x, e3y,
-                                    o1px, o1py, e1x, e1y);
-        pts[1] = line_intersection(o1px, o1py, e1x, e1y,
-                                    o2px, o2py, e2x, e2y);
-        pts[2] = line_intersection(o2px, o2py, e2x, e2y,
-                                    o3px, o3py, e3x, e3y);
-        pts[3] = line_intersection(i3px, i3py, e3x, e3y,
-                                    i1px, i1py, e1x, e1y);
-        pts[4] = line_intersection(i1px, i1py, e1x, e1y,
-                                    i2px, i2py, e2x, e2y);
-        pts[5] = line_intersection(i2px, i2py, e2x, e2y,
-                                    i3px, i3py, e3x, e3y);
+        pts[0] = line_intersection(o3px, o3py, e3x, e3y, o1px, o1py, e1x, e1y);
+        pts[1] = line_intersection(o1px, o1py, e1x, e1y, o2px, o2py, e2x, e2y);
+        pts[2] = line_intersection(o2px, o2py, e2x, e2y, o3px, o3py, e3x, e3y);
+        pts[3] = line_intersection(i3px, i3py, e3x, e3y, i1px, i1py, e1x, e1y);
+        pts[4] = line_intersection(i1px, i1py, e1x, e1y, i2px, i2py, e2x, e2y);
+        pts[5] = line_intersection(i2px, i2py, e2x, e2y, i3px, i3py, e3x, e3y);
 
         /// Miter limit：当 miter point 离顶点超过 2*line_width 时，回退到该
         /// 顶点本身（bevel join 的效果），防止极尖角产生巨大尖刺。
@@ -1676,9 +1685,9 @@ void bgt_draw_triangle(int x1, int y1, int x2, int y2, int x3, int y3)
         /// quad2: 1,2,5,4 → 三角形 (1,2,5) + (1,5,4)
         /// quad3: 2,0,3,5 → 三角形 (2,0,3) + (2,3,5)
         const int indices[] = {
-            0, 1, 4,  0, 4, 3,   ///< quad1
-            1, 2, 5,  1, 5, 4,   ///< quad2
-            2, 0, 3,  2, 3, 5,   ///< quad3
+            0, 1, 4, 0, 4, 3, ///< quad1
+            1, 2, 5, 1, 5, 4, ///< quad2
+            2, 0, 3, 2, 3, 5, ///< quad3
         };
         SDL_RenderGeometry(s.renderer, nullptr, verts, 6, indices, 18);
     }
@@ -1860,8 +1869,8 @@ void bgt_draw_image(int image_id, int x, int y)
     const float ty = static_cast<float>(y + entry->offset_y);
 
     /// 快路径：恒等变换（无旋转、无缩放）时直接贴图。
-    if (entry->rotation == 0.0 && entry->scale_x == 1.0 && entry->scale_y == 1.0)
-    {
+    if (entry->rotation == 0.0 && entry->scale_x == 1.0 &&
+        entry->scale_y == 1.0) {
         const SDL_FRect dst{tx, ty, texture_width, texture_height};
         SDL_RenderTexture(s.renderer, entry->texture, nullptr, &dst);
         return;
@@ -1873,17 +1882,16 @@ void bgt_draw_image(int image_id, int x, int y)
     /// 之后，顺序是 T × flip × R × S，违反 RST 的 T × R × S(负值) 合成顺序）。
     const double sx = entry->scale_x;
     const double sy = entry->scale_y;
-    const double radians =
-        entry->rotation * 3.14159265358979323846 / 180.0;
+    const double radians = entry->rotation * 3.14159265358979323846 / 180.0;
     const double cos_a = std::cos(radians);
     const double sin_a = std::sin(radians);
 
     const auto rst = [sx, sy, cos_a, sin_a, tx, ty](double lx, double ly) {
-        const double vx = lx * sx;                    ///< S（缩放，负值翻转）
+        const double vx = lx * sx; ///< S（缩放，负值翻转）
         const double vy = ly * sy;
-        const double rx = vx * cos_a - vy * sin_a;    ///< R（顺时针，屏幕坐标系）
+        const double rx = vx * cos_a - vy * sin_a; ///< R（顺时针，屏幕坐标系）
         const double ry = vx * sin_a + vy * cos_a;
-        return SDL_FPoint{static_cast<float>(rx + tx),   ///< T（平移）
+        return SDL_FPoint{static_cast<float>(rx + tx), ///< T（平移）
                           static_cast<float>(ry + ty)};
     };
 
@@ -2126,8 +2134,8 @@ bool bgt_hit_point_circle(int px, int py, int x, int y, int radius)
     return dx * dx + dy * dy <= r * r;
 }
 
-bool bgt_hit_rect_rect(int x1, int y1, int width1, int height1,
-                       int x2, int y2, int width2, int height2)
+bool bgt_hit_rect_rect(int x1, int y1, int width1, int height1, int x2, int y2,
+                       int width2, int height2)
 {
     /// 显式守卫：空矩形被另一矩形"跨立"时严格不等式仍会成立，
     /// 必须先排除（与圆形函数的半径守卫同理）。
@@ -2155,8 +2163,8 @@ bool bgt_hit_circle_circle(int x1, int y1, int radius1, int x2, int y2,
     return dx * dx + dy * dy < sum * sum;
 }
 
-bool bgt_hit_circle_rect(int cx, int cy, int radius, int x, int y,
-                         int width, int height)
+bool bgt_hit_circle_rect(int cx, int cy, int radius, int x, int y, int width,
+                         int height)
 {
     if (radius <= 0 || width <= 0 || height <= 0) {
         return false;
@@ -2309,8 +2317,7 @@ bool storage_names(const char section[], const char key[],
         return false;
     }
     if (!valid_key_name(key_out)) {
-        s.set_error(BGT_ERROR_STORAGE,
-                    "invalid key name: '" + key_out + "'");
+        s.set_error(BGT_ERROR_STORAGE, "invalid key name: '" + key_out + "'");
         return false;
     }
     return true;
@@ -2512,8 +2519,8 @@ void bgt_set_string(const char section[], const char key[], const char value[])
     const std::string text =
         value == nullptr ? std::string() : trim_copy(value);
     if (text.find('\n') != std::string::npos) {
-        state().set_error(
-            BGT_ERROR_STORAGE, "string value must not contain a newline");
+        state().set_error(BGT_ERROR_STORAGE,
+                          "string value must not contain a newline");
         return;
     }
     state().storage[section_name][key_name] = text;
@@ -2533,9 +2540,9 @@ int bgt_get_int(const char section[], const char key[], int default_value)
     }
     int value = 0;
     if (!parse_int_text(*text, value)) {
-        s.set_error(BGT_ERROR_STORAGE,
-                    "storage entry '" + section_name + "." + key_name +
-                        "' is not an integer: '" + *text + "'");
+        s.set_error(BGT_ERROR_STORAGE, "storage entry '" + section_name + "." +
+                                           key_name + "' is not an integer: '" +
+                                           *text + "'");
         return default_value;
     }
     return value;
@@ -2556,9 +2563,9 @@ double bgt_get_double(const char section[], const char key[],
     }
     double value = 0.0;
     if (!parse_double_text(*text, value)) {
-        s.set_error(BGT_ERROR_STORAGE,
-                    "storage entry '" + section_name + "." + key_name +
-                        "' is not a number: '" + *text + "'");
+        s.set_error(BGT_ERROR_STORAGE, "storage entry '" + section_name + "." +
+                                           key_name + "' is not a number: '" +
+                                           *text + "'");
         return default_value;
     }
     return value;
@@ -2613,8 +2620,7 @@ bool bgt_load(const char filename[])
         std::error_code probe_error;
         if (std::filesystem::exists(native_path, probe_error)) {
             s.set_error(BGT_ERROR_STORAGE,
-                        "failed to open storage file " +
-                            std::string(filename));
+                        "failed to open storage file " + std::string(filename));
             return false;
         }
         /// 文件不存在是正常情况（比如游戏第一次运行）：空表、无错误。
@@ -2624,9 +2630,8 @@ bool bgt_load(const char filename[])
     const std::string content((std::istreambuf_iterator<char>(file)),
                               std::istreambuf_iterator<char>());
     if (file.bad()) {
-        s.set_error(BGT_ERROR_STORAGE,
-                    "failed while reading storage file " +
-                        std::string(filename));
+        s.set_error(BGT_ERROR_STORAGE, "failed while reading storage file " +
+                                           std::string(filename));
         return false;
     }
     const std::string text = storage_file_text(content);
@@ -2727,10 +2732,9 @@ bool bgt_save(const char filename[])
     std::filesystem::rename(bgt::to_native_path(temp_name),
                             bgt::to_native_path(filename), rename_error);
     if (rename_error) {
-        s.set_error(BGT_ERROR_STORAGE,
-                    "failed to replace storage file " +
-                        std::string(filename) + ": " +
-                        rename_error.message());
+        s.set_error(BGT_ERROR_STORAGE, "failed to replace storage file " +
+                                           std::string(filename) + ": " +
+                                           rename_error.message());
         return false;
     }
     return true;
@@ -2749,7 +2753,8 @@ int bgt_load_sound(const char filename[])
     /// SDL_mixer 按 UTF-8 解释路径，filename 是源编码；错误消息里仍用
     /// 源编码原文。
     const bgt::Utf8View utf8_filename(filename);
-    MIX_Audio *audio = MIX_LoadAudio(s.audio_mixer, utf8_filename.c_str(), false);
+    MIX_Audio *audio =
+        MIX_LoadAudio(s.audio_mixer, utf8_filename.c_str(), false);
     if (audio == nullptr) {
         s.set_error(BGT_ERROR_AUDIO,
                     "failed to load sound " + std::string(filename));
@@ -2785,9 +2790,8 @@ void bgt_play_sound(int id)
         track = s.sound_tracks.front();
     }
     if (!MIX_SetTrackAudio(track, entry_it->second.audio) ||
-        !MIX_SetTrackGain(track,
-                          static_cast<float>(entry_it->second.volume) /
-                              100.0f) ||
+        !MIX_SetTrackGain(track, static_cast<float>(entry_it->second.volume) /
+                                     100.0f) ||
         !MIX_PlayTrack(track, 0)) {
         s.set_error(BGT_ERROR_AUDIO, "failed to play sound");
     }
@@ -2926,8 +2930,7 @@ void prefix_copy(const std::string &text, char out[], int out_size)
  * @param size 字号（像素）。
  * @param message 错误消息（源编码）；按值传入的副本。
  */
-void draw_wrapped_error(State &s, int x, int y, int size,
-                        std::string message)
+void draw_wrapped_error(State &s, int x, int y, int size, std::string message)
 {
     /// message 已经是本次调用的副本，直接原地换成 UTF-8。
     message = bgt::to_utf8(message);
@@ -2959,8 +2962,7 @@ void draw_wrapped_error(State &s, int x, int y, int size,
         std::size_t break_at = start + measured_length;
         if (break_at < message.size()) {
             /// 本行放不下整条消息：优先在行内最后一个空格处断行。
-            const std::size_t space =
-                message.find_last_of(' ', break_at - 1);
+            const std::size_t space = message.find_last_of(' ', break_at - 1);
             if (space != std::string::npos && space > start) {
                 break_at = space;
             }
@@ -3011,8 +3013,8 @@ void bgt_error_text(int index, char out[], int out_size)
         out[0] = '\0';
         return;
     }
-    prefix_copy(
-        s.errors[static_cast<std::size_t>(index)].message, out, out_size);
+    prefix_copy(s.errors[static_cast<std::size_t>(index)].message, out,
+                out_size);
 }
 
 void bgt_print_error(int index)
