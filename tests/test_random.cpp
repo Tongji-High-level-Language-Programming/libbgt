@@ -1,7 +1,10 @@
-// libbgt 随机数 API 的最小测试（纯函数，无需打开窗口）。
-// 用显式检查而非 assert：Release（NDEBUG）下 assert 是空操作，
-// 显式检查在任何构建配置下都真正生效。
-// 用 -DBGT_BUILD_TESTS=ON 配置后由 ctest 运行。
+/**
+ * @file test_random.cpp
+ * @brief libbgt 随机数 API 的最小测试（纯函数，无需打开窗口）。
+ * @details 用显式检查而非 `assert`：Release（NDEBUG）下 `assert` 是空操作，
+ *          显式检查在任何构建配置下都真正生效。
+ *          用 `-DBGT_BUILD_TESTS=ON` 配置后由 ctest 运行。
+ */
 
 #include "bgt.h"
 
@@ -17,7 +20,9 @@ constexpr unsigned kSeed = 42;
 
 int g_failed_checks = 0;
 
-// 显式检查宏：失败时打印表达式与位置，任何构建配置下都生效。
+/**
+ * @brief 显式检查宏：失败时打印表达式与位置，任何构建配置下都生效。
+ */
 #define BGT_CHECK(condition)                                            \
     do {                                                                \
         if (!(condition)) {                                             \
@@ -27,8 +32,14 @@ int g_failed_checks = 0;
         }                                                               \
     } while (false)
 
-// 从 [min, max) 半开区间反复抽样：检查每个值都落在区间内，且每个值都
-// 出现过（均匀性粗检）。
+/**
+ * @brief 从 [min, max) 半开区间反复抽样。
+ *
+ * 检查每个值都落在区间内，且每个值都出现过（均匀性粗检）。
+ *
+ * @param min 区间下界（含）。
+ * @param max 区间上界（不含）。
+ */
 void check_all_values_appear(int min, int max)
 {
     std::array<bool, 64> seen{};
@@ -47,7 +58,7 @@ void check_all_values_appear(int min, int max)
 
 int main()
 {
-    // 1) 相同种子 → 完全相同的随机序列（可复现）
+    /// 1) 相同种子 → 完全相同的随机序列（可复现）
     std::array<int, 16> first_ints{};
     std::array<double, 16> first_doubles{};
     bgt_random_seed(kSeed);
@@ -68,32 +79,32 @@ int main()
         BGT_CHECK(first_doubles[i] == second_doubles[i]);
     }
 
-    // 2) 半开区间：min 能取到，max 取不到
-    check_all_values_appear(0, 6);    // 0~5，正好当长度 6 的数组下标
-    check_all_values_appear(-3, 4);   // -3~3
+    /// 2) 半开区间：min 能取到，max 取不到
+    check_all_values_appear(0, 6);    ///< 0~5，正好当长度 6 的数组下标
+    check_all_values_appear(-3, 4);   ///< -3~3
 
-    // 3) min > max 时自动交换
+    /// 3) min > max 时自动交换
     for (int i = 0; i < 1000; i++) {
         const int value = bgt_random(50, 2);
         BGT_CHECK(value >= 2 && value < 50);
     }
 
-    // 4) min == max 时直接返回该值（空区间）
+    /// 4) min == max 时直接返回该值（空区间）
     BGT_CHECK(bgt_random(7, 7) == 7);
     BGT_CHECK(bgt_random(3.5, 3.5) == 3.5);
 
-    // 5) 小数版同样是半开：永远取不到 max
+    /// 5) 小数版同样是半开：永远取不到 max
     for (int i = 0; i < 10000; i++) {
         const double value = bgt_random(0.0, 1.0);
         BGT_CHECK(value >= 0.0);
         BGT_CHECK(value < 1.0);
     }
     for (int i = 0; i < 1000; i++) {
-        const double value = bgt_random(5.0, 2.0);    // 交换后 [2, 5)
+        const double value = bgt_random(5.0, 2.0);    ///< 交换后 [2, 5)
         BGT_CHECK(value >= 2.0 && value < 5.0);
     }
 
-    // 6) 不重新播种时，连续两段序列应当不同（引擎在持续前进）
+    /// 6) 不重新播种时，连续两段序列应当不同（引擎在持续前进）
     std::array<int, 64> window_a{};
     std::array<int, 64> window_b{};
     for (int i = 0; i < 64; i++) {

@@ -1,14 +1,22 @@
-// 构建期转码工具：把 UTF-8 文本文件写成目标编码。
-//
-// 用途：
-//   * 生成 GBK 版头文件（BGT_SOURCE_ENCODING=GBK 时分发给学生，见 docs/encoding.md）；
-//   * 生成 GBK 版的课程分发物（示例源码、文档）。
-//
-// 用法：bgt_transcode <源文件> <目标文件> <utf-8|gbk> [--prepend <一行文本>]
-//
-// 逐行严格转换：出现既不是合法 UTF-8、又无法用目标编码表示的字符时，报出文件名
-// 与行号并以非 0 退出，避免悄悄发出一个残缺的头文件。--prepend 在输出最前面插入
-// 一行，用来让 GBK 版头文件自描述（固定 BGT_SOURCE_ENCODING）。
+/**
+ * @file bgt_transcode.cpp
+ * @brief 构建期转码工具：把 UTF-8 文本文件写成目标编码。
+ * @details 用途：
+ *          - 生成 GBK 版头文件（`BGT_SOURCE_ENCODING=GBK` 时分发给学生，
+ *            见 `docs/encoding.md`）；
+ *          - 生成 GBK 版的课程分发物（示例源码、文档）。
+ *
+ *          用法：
+ *          @code
+ *          bgt_transcode <源文件> <目标文件> <utf-8|gbk>
+ *                        [--prepend <一行文本>]
+ *          @endcode
+ *
+ *          逐行严格转换：出现既不是合法 UTF-8、又无法用目标编码表示的字符
+ *          时，报出文件名与行号并以非 0 退出，避免悄悄发出一个残缺的头文件。
+ *          `--prepend` 在输出最前面插入一行，用来让 GBK 版头文件自描述
+ *          （固定 `BGT_SOURCE_ENCODING`）。
+ */
 
 #include "bgt_encoding.h"
 
@@ -19,8 +27,12 @@
 
 namespace {
 
+/// @brief UTF-8 BOM 的字节序列。
 const char kUtf8Bom[] = "\xEF\xBB\xBF";
 
+/**
+ * @brief 向 stderr 打印命令行用法。
+ */
 void print_usage()
 {
     std::fprintf(stderr,
@@ -28,6 +40,15 @@ void print_usage()
                  "[--prepend <line>]\n");
 }
 
+/**
+ * @brief 解析命令行给出的目标编码名。
+ *
+ * 接受 `utf-8` / `utf8` / `UTF-8` 与 `gbk` / `GBK`。
+ *
+ * @param name 命令行中的编码名。
+ * @param[out] out 解析成功时写入目标编码；失败时不改动。
+ * @return 解析成功返回 true；无法识别返回 false。
+ */
 bool parse_encoding(const std::string &name, bgt::Encoding &out)
 {
     if (name == "utf-8" || name == "utf8" || name == "UTF-8") {
@@ -41,6 +62,13 @@ bool parse_encoding(const std::string &name, bgt::Encoding &out)
     return false;
 }
 
+/**
+ * @brief 以二进制方式把整个文件读入字符串。
+ *
+ * @param path 文件路径。
+ * @param[out] out 读取成功时写入文件内容。
+ * @return 读取成功返回 true；打开失败或读取出错返回 false。
+ */
 bool read_file(const char *path, std::string &out)
 {
     std::ifstream file(path, std::ios::in | std::ios::binary);
@@ -52,6 +80,13 @@ bool read_file(const char *path, std::string &out)
     return !file.bad();
 }
 
+/**
+ * @brief 以二进制方式把字符串写入文件（覆盖已有内容）。
+ *
+ * @param path 文件路径。
+ * @param text 要写入的内容。
+ * @return 写入成功返回 true；打开或写入失败返回 false。
+ */
 bool write_file(const char *path, const std::string &text)
 {
     std::ofstream file(path, std::ios::out | std::ios::binary | std::ios::trunc);
@@ -63,7 +98,14 @@ bool write_file(const char *path, const std::string &text)
     return static_cast<bool>(file);
 }
 
-// 按 '\n' 切分并保留行尾，这样报错可以精确到行。
+/**
+ * @brief 按 `'\n'` 切分文本并保留行尾。
+ *
+ * 保留行尾，这样报错可以精确到行。
+ *
+ * @param text 输入文本。
+ * @return 切分后的行；每行都含行尾换行符（最后一行可能没有）。
+ */
 std::vector<std::string> split_lines(const std::string &text)
 {
     std::vector<std::string> lines;
@@ -81,8 +123,19 @@ std::vector<std::string> split_lines(const std::string &text)
     return lines;
 }
 
-// 逐行严格转换，结果追加到 out 末尾（调用方负责准备初始内容，例如 --prepend
-// 生成的那一行）。失败时报出 1 起始的行号。
+/**
+ * @brief 逐行严格转换文本，并把结果追加到 `out` 末尾。
+ *
+ * 调用方负责准备初始内容（例如 `--prepend` 生成的那一行）。失败时报出
+ * 1 起始的行号。
+ *
+ * @param text 待转换的 UTF-8 文本。
+ * @param to 目标编码。
+ * @param source_name 出错时报出的文件名。
+ * @param first_line 第一行对应的行号。
+ * @param[in,out] out 转换结果追加到这里。
+ * @return 全部转换成功返回 true；否则返回 false。
+ */
 bool convert_lines(const std::string &text, bgt::Encoding to,
                    const char *source_name, std::size_t first_line,
                    std::string &out)
@@ -105,6 +158,13 @@ bool convert_lines(const std::string &text, bgt::Encoding to,
 
 } // namespace
 
+/**
+ * @brief 程序入口：解析命令行参数、执行转码并返回退出状态。
+ *
+ * @param argc 参数个数。
+ * @param argv 参数数组。
+ * @return 成功返回 0；参数错误、转码失败或读写失败返回非 0。
+ */
 int main(int argc, char **argv)
 {
     if (argc < 4) {
@@ -138,7 +198,7 @@ int main(int argc, char **argv)
         std::fprintf(stderr, "bgt_transcode: cannot read %s\n", source_path);
         return 3;
     }
-    // 输入带 UTF-8 BOM 时跳过：输出编码由参数决定，不再重复写 BOM。
+    /// 输入带 UTF-8 BOM 时跳过：输出编码由参数决定，不再重复写 BOM。
     if (source.rfind(kUtf8Bom, 0) == 0) {
         source.erase(0, 3);
     }

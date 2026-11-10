@@ -1,0 +1,32 @@
+# libbgt API 文档的 Doxygen 配置。
+#
+# 用法（在仓库根目录执行）：
+#     doxygen Doxyfile
+# 生成结果在 docs/doxygen/html/index.html（该目录已被 .gitignore 忽略）。
+#
+# 文档覆盖公开头文件 include/bgt.h、库实现 src/ 与构建期工具 tools/；
+# 第三方依赖 third_party/ 不参与文档生成。
+
+PROJECT_NAME           = "libbgt"
+PROJECT_BRIEF          = "面向 C++ 初学者的轻量级 2D 图形库"
+PROJECT_NUMBER         = 0.1.0
+
+OUTPUT_DIRECTORY       = docs/doxygen
+INPUT                  = include src tools
+FILE_PATTERNS          = *.h *.cpp
+RECURSIVE              = YES
+EXCLUDE                = third_party
+INPUT_ENCODING         = UTF-8
+
+EXTRACT_ALL            = YES
+EXTRACT_STATIC         = YES
+SOURCE_BROWSER         = YES
+GENERATE_LATEX         = NO
+GENERATE_TREEVIEW      = YES
+HAVE_DOT               = NO
+
+WARN_IF_UNDOCUMENTED   = NO
+WARN_IF_DOC_ERROR      = YES
+WARN_AS_ERROR          = NO
+
+QUIET                  = YES

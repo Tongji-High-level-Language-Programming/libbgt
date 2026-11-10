@@ -1,3 +1,12 @@
+/**
+ * @file 03_text.cpp
+ * @brief libbgt 文本示例：中文绘制、默认字号与文字尺寸测量。
+ * @details 演示 `bgt_draw_text()` 的两种字号用法：用
+ *          `bgt_set_font_size()` 设置默认字号，或在调用时直接传字号。
+ *          再用 `bgt_text_width()` / `bgt_text_height()` 量出文字尺寸，
+ *          画背景块并做水平居中。
+ */
+
 #include "bgt.h"
 
 // NOLINTBEGIN(readability-magic-numbers)

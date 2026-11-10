@@ -1,3 +1,11 @@
+/**
+ * @file 04_input.cpp
+ * @brief libbgt 输入示例：键盘、鼠标与滚轮驱动一个可移动的圆。
+ * @details 方向键或 WASD 连续移动（`bgt_key_is_down()`）；鼠标左键让圆
+ *          跳到点击位置并变色，右键换色，滚轮改变半径；空格换色，Esc
+ *          退出。窗口用 `bgt_open_window_resizable()` 创建，可以拖拽缩放。
+ */
+
 #include "bgt.h"
 
 // NOLINTBEGIN(readability-magic-numbers,

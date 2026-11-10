@@ -1,13 +1,18 @@
-// =====================================================================
-// libbgt 文件存档 API 演示（v0.3）
-// 每个板块演示存档的一组能力，按【空格】进入下一板块，随时可以按
-// 【Esc】退出。存档文件 save.txt 就在程序旁边，是普通文本文件，可以
-// 用记事本打开查看；改完存档再回到程序里按【R】，改动立刻生效。
-//   板块 1  最高分 —— 关掉程序再重新运行，最高分还在
-//   板块 2  存档内容 —— 屏幕上看存档文本，手改后重读生效
-//   板块 3  玩家名字 —— 字符串存取
-//   板块 4  数独盘面 —— 81 字符盘面一键存/读
-// =====================================================================
+/**
+ * @file 10_storage.cpp
+ * @brief libbgt 文件存档 API 演示（v0.3）。
+ * @details 每个板块演示存档的一组能力，按【空格】进入下一板块，随时
+ *          可以按【Esc】退出。存档文件 save.txt 就在程序旁边，是普通
+ *          文本文件，可以用记事本打开查看；改完存档再回到程序里
+ *          按【R】，改动立刻生效。
+ *
+ * 板块划分：
+ *   板块 1  最高分 —— 关掉程序再重新运行，最高分还在
+ *   板块 2  存档内容 —— 屏幕上看存档文本，手改后重读生效
+ *   板块 3  玩家名字 —— 字符串存取
+ *   板块 4  数独盘面 —— 81 字符盘面一键存/读
+ */
+
 // NOLINTBEGIN(readability-magic-numbers, readability-identifier-length,
 // readability-function-cognitive-complexity)
 
@@ -26,34 +31,34 @@ int main()
     }
     bgt_set_background(BGT_WHITE);
 
-    // ---------- 读档：程序一启动就把存档读进内存 ----------
-    // 第一次运行时 save.txt 还不存在：bgt_load 不报错，内存表为空，
-    // 所有 bgt_get_* 都拿到默认值。
+    /// ---------- 读档：程序一启动就把存档读进内存 ----------
+    /// 第一次运行时 save.txt 还不存在：bgt_load 不报错，内存表为空，
+    /// 所有 bgt_get_* 都拿到默认值。
     bgt_load("save.txt");
 
-    // 各板块共用的跨帧状态（就是普通变量）
-    int part = 1; // 当前板块号：1 到 4
+    /// 各板块共用的跨帧状态（就是普通变量）
+    int part = 1; ///< 当前板块号：1 到 4
 
-    // 板块 1：最高分
+    /// 板块 1：最高分
     int best = bgt_get_int("最高分", "best", 0);
     int score = 0;
 
-    // 板块 3：玩家名字（从存档读，没有就先用默认名）
+    /// 板块 3：玩家名字（从存档读，没有就先用默认名）
     char name[32] = {};
     bgt_get_string("玩家", "name", name, 32, "无名");
     char names[4][8] = {"张三", "李四", "王五", "小明"};
-    // “无名”不在预设名单里：起始序号停在名单外，
-    // 第一次按【N】先轮到“张三”，不会跳过它。
+    /// “无名”不在预设名单里：起始序号停在名单外，
+    /// 第一次按【N】先轮到“张三”，不会跳过它。
     int name_index = -1;
 
-    // 板块 4：数独盘面（81 个字符，'.' 表示空格）
-    // 没存过盘面时，get 的默认值就是当前屏幕上的盘面（原地保持）。
+    /// 板块 4：数独盘面（81 个字符，'.' 表示空格）
+    /// 没存过盘面时，get 的默认值就是当前屏幕上的盘面（原地保持）。
     char board[82] =
         "53..7....6..195....98....6.8...6...34..8.3..1"
         "7...2...6.6....28....419..5....8..79";
     bgt_get_string("盘面", "board", board, 82, board);
-    // 手改存档可能把盘面改短：结束符后面的格子补成“空”（.），
-    // 免得上一次盘面的残尾数字混进画面。
+    /// 手改存档可能把盘面改短：结束符后面的格子补成“空”（.），
+    /// 免得上一次盘面的残尾数字混进画面。
     int board_end = 0;
     while (board_end < 81 && board[board_end] != '\0') {
         board_end = board_end + 1;
@@ -67,7 +72,7 @@ int main()
     char action_text[64] = "按方向键选格子，回车改数字";
 
     while (bgt_window_is_open()) {
-        // ---------- 板块 1：最高分 ----------
+        /// ---------- 板块 1：最高分 ----------
         if (part == 1) {
             bgt_set_window_title("libbgt 文件存档演示 - 板块 1：最高分");
             if (bgt_key_just_pressed(BGT_KEY_ENTER)) {
@@ -75,7 +80,7 @@ int main()
                 if (score > best) {
                     best = score;
                     bgt_set_int("最高分", "best", best);
-                    bgt_save("save.txt"); // 破纪录立刻写盘
+                    bgt_save("save.txt"); ///< 破纪录立刻写盘
                 }
             }
             bgt_set_color(BGT_BLACK);
@@ -95,16 +100,16 @@ int main()
                           "关掉这个窗口，再重新运行程序——最高分还在！", 22);
         }
 
-        // ---------- 板块 2：记事本透明度 ----------
+        /// ---------- 板块 2：记事本透明度 ----------
         if (part == 2) {
             bgt_set_window_title("libbgt 文件存档演示 - 板块 2：存档内容");
             if (bgt_key_just_pressed(BGT_KEY_R)) {
                 bgt_clear_error();
-                bgt_load("save.txt"); // 把文件重新读进内存
+                bgt_load("save.txt"); ///< 把文件重新读进内存
                 best = bgt_get_int("最高分", "best", 0);
                 bgt_get_string("玩家", "name", name, 32, "无名");
                 bgt_get_string("盘面", "board", board, 82, board);
-                // 盘面同样补尾（见程序开头）
+                /// 盘面同样补尾（见程序开头）
                 int board_end = 0;
                 while (board_end < 81 && board[board_end] != '\0') {
                     board_end = board_end + 1;
@@ -117,8 +122,8 @@ int main()
             bgt_set_color(BGT_BLACK);
             bgt_draw_text(40, 36, "板块 2：save.txt 的内容 —— 文本存档看得见", 32);
             bgt_draw_text(80, 130, "存档文件 save.txt 现在长这样（按字典序）：", 22);
-            // 存档没有“整表打印”函数：每个键都是自己存进去的，
-            // 直接逐个取出来，照文件里的样子画。
+            /// 存档没有“整表打印”函数：每个键都是自己存进去的，
+            /// 直接逐个取出来，照文件里的样子画。
             bgt_set_color(BGT_BLUE);
             char line_text[96] = {};
             int y = 170;
@@ -144,7 +149,7 @@ int main()
                           "文本！", 22);
         }
 
-        // ---------- 板块 3：玩家名字 ----------
+        /// ---------- 板块 3：玩家名字 ----------
         if (part == 3) {
             bgt_set_window_title("libbgt 文件存档演示 - 板块 3：玩家名字");
             if (bgt_key_just_pressed(BGT_KEY_N)) {
@@ -167,7 +172,7 @@ int main()
                           "读字符串要有一个数组接住它：bgt_get_string。", 22);
         }
 
-        // ---------- 板块 4：数独盘面 ----------
+        /// ---------- 板块 4：数独盘面 ----------
         if (part == 4) {
             bgt_set_window_title("libbgt 文件存档演示 - 板块 4：数独盘面");
             if (bgt_key_just_pressed(BGT_KEY_LEFT)) {
@@ -205,7 +210,7 @@ int main()
             if (bgt_key_just_pressed(BGT_KEY_L)) {
                 if (bgt_load("save.txt")) {
                     bgt_get_string("盘面", "board", board, 82, board);
-                    // 盘面同样补尾（见程序开头）
+                    /// 盘面同样补尾（见程序开头）
                     int board_end = 0;
                     while (board_end < 81 && board[board_end] != '\0') {
                         board_end = board_end + 1;
@@ -223,7 +228,7 @@ int main()
             }
             bgt_set_color(BGT_BLACK);
             bgt_draw_text(40, 36, "板块 4：数独盘面 —— 81 个字符一键存/读", 32);
-            // 9x9 网格：每个字符画一个格子，光标格子填黄色
+            /// 9x9 网格：每个字符画一个格子，光标格子填黄色
             constexpr int cell = 36;
             constexpr int grid_x = 80;
             constexpr int grid_y = 110;
@@ -256,7 +261,7 @@ int main()
                           "盘面还在。", 22);
         }
 
-        // 底部统一提示
+        /// 底部统一提示
         bgt_set_color(BGT_DARK_GRAY);
         if (part < 4) {
             bgt_draw_text(40, 648,
@@ -266,7 +271,7 @@ int main()
                           "按【Esc】退出程序 —— save.txt 留在程序目录里", 24);
         }
 
-        // 每个板块都支持按空格进入下一板块；最后一个板块按空格关闭
+        /// 每个板块都支持按空格进入下一板块；最后一个板块按空格关闭
         if (bgt_key_just_pressed(BGT_KEY_SPACE)) {
             if (part < 4) {
                 part = part + 1;

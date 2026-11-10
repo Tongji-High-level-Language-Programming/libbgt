@@ -1,15 +1,17 @@
-// =====================================================================
-// libbgt 随机数 API 演示（v0.2）
-//
-// 每个板块介绍一小块随机数 API，按【空格】进入下一板块，随时可以按
-// 【Esc】退出。bgt_random(min, max) 是统一入口：整数参数得到随机整数，
-// 小数参数得到随机小数，区间都是半开 [min, max)。
-//
-//   板块 1  掷骰子 —— bgt_random 半开区间与数组下标
-//   板块 2  满天星 —— 随机位置、大小、颜色
-//   板块 3  随机游走 —— 每帧随机挪一步
-//   板块 4  随机种子 —— 可复现的随机
-// =====================================================================
+/**
+ * @file 08_random.cpp
+ * @brief libbgt 随机数 API 演示（v0.2）。
+ * @details 每个板块介绍一小块随机数 API，按【空格】进入下一板块，随时
+ *          可以按【Esc】退出。`bgt_random(min, max)` 是统一入口：整数
+ *          参数得到随机整数，小数参数得到随机小数，区间都是半开
+ *          [min, max)。
+ *
+ * 板块划分：
+ *   板块 1  掷骰子 —— `bgt_random` 半开区间与数组下标
+ *   板块 2  满天星 —— 随机位置、大小、颜色
+ *   板块 3  随机游走 —— 每帧随机挪一步
+ *   板块 4  随机种子 —— 可复现的随机
+ */
 
 #include "bgt.h"
 
@@ -20,7 +22,7 @@
 
 int main()
 {
-    // ---------- 常量 ----------
+    /// ---------- 常量 ----------
     const int window_width = 1000;
     const int window_height = 700;
     const int target_fps = 60;
@@ -31,20 +33,20 @@ int main()
     }
     bgt_set_fps_limit(target_fps);
 
-    // ---------- 各板块需要的"跨帧状态"（就是普通变量）----------
+    /// ---------- 各板块需要的"跨帧状态"（就是普通变量）----------
 
-    int part = 1; // 当前板块号：1 到 4
+    int part = 1; ///< 当前板块号：1 到 4
 
-    // 板块 1：骰子直方图
-    int counts[6] = {0, 0, 0, 0, 0, 0}; // counts[i] 记录点数 i+1 出现的次数
+    /// 板块 1：骰子直方图
+    int counts[6] = {0, 0, 0, 0, 0, 0}; ///< counts[i] 记录点数 i+1 出现的次数
     int total_rolls = 0;
     int last_roll = 1;
 
-    // 板块 2：星星调色板（星空画在深色背景上）
+    /// 板块 2：星星调色板（星空画在深色背景上）
     const unsigned star_colors[6] = {BGT_WHITE, BGT_YELLOW, BGT_CYAN,
                                      BGT_MAGENTA, BGT_ORANGE, BGT_PINK};
 
-    // 板块 3：八只随机游走的小虫
+    /// 板块 3：八只随机游走的小虫
     bool walk_started = false;
     int walker_x[8];
     int walker_y[8];
@@ -52,29 +54,29 @@ int main()
                                        BGT_ORANGE, BGT_PURPLE, BGT_BROWN,
                                        BGT_CYAN, BGT_MAGENTA};
 
-    // 板块 4：种子对比
+    /// 板块 4：种子对比
     bool seed_demo_ready = false;
-    int seeded_nums[10]; // 左列：每次都重新 seed(42) 后取的 10 个数
-    int plain_nums[10];  // 右列：不重新播种，延续全局序列取的 10 个数
+    int seeded_nums[10]; ///< 左列：每次都重新 seed(42) 后取的 10 个数
+    int plain_nums[10];  ///< 右列：不重新播种，延续全局序列取的 10 个数
     double double_samples[3];
 
-    // ---------- 主循环 ----------
+    /// ---------- 主循环 ----------
     while (bgt_window_is_open()) {
 
-        // 随时退出
+        /// 随时退出
         if (bgt_key_just_pressed(BGT_KEY_ESCAPE)) {
             bgt_close_window();
             break;
         }
 
         if (part == 1) {
-            // =====================================================
-            // 板块 1：掷骰子 —— bgt_random 半开区间与数组下标
-            // =====================================================
+            /// =====================================================
+            /// 板块 1：掷骰子 —— bgt_random 半开区间与数组下标
+            /// =====================================================
             bgt_set_background(bgt_rgb(250, 250, 250));
             bgt_set_window_title("libbgt 随机数演示 - 板块 1：掷骰子");
 
-            // 按 R：掷 100 次骰子，加入直方图
+            /// 按 R：掷 100 次骰子，加入直方图
             if (bgt_key_just_pressed(BGT_KEY_R)) {
                 for (int i = 0; i < 100; i++) {
                     const int v = bgt_random(1, 7);
@@ -98,7 +100,7 @@ int main()
                           "参数写反也没关系——min 大于 max 时库会自动交换。",
                           20);
 
-            // 画骰子：白底黑框，按点数画骰面
+            /// 画骰子：白底黑框，按点数画骰面
             const int die_x = 80;
             const int die_y = 220;
             bgt_set_color(BGT_WHITE);
@@ -106,7 +108,7 @@ int main()
             bgt_set_color(BGT_BLACK);
             bgt_draw_rect(die_x, die_y, 120, 120);
 
-            // 骰面上 6 个"点位"的坐标（相对骰子左上角）
+            /// 骰面上 6 个"点位"的坐标（相对骰子左上角）
             const int pip_tl_x = die_x + 30;
             const int pip_tl_y = die_y + 30;
             const int pip_tr_x = die_x + 90;
@@ -164,7 +166,7 @@ int main()
             bgt_set_color(BGT_DARK_GRAY);
             bgt_draw_text(die_x, 412, "按【R】掷 100 次", 18);
 
-            // 直方图：六根柱子显示每个点数被掷出的次数
+            /// 直方图：六根柱子显示每个点数被掷出的次数
             int max_count = 1;
             for (int v = 0; v < 6; v++) {
                 if (counts[v] > max_count) {
@@ -196,7 +198,7 @@ int main()
             bgt_set_color(BGT_DARK_GRAY);
             bgt_draw_text(300, 615, total_text, 18);
 
-            // 半开区间的招牌场景：bgt_random(0, 8) 的结果直接当数组下标
+            /// 半开区间的招牌场景：bgt_random(0, 8) 的结果直接当数组下标
             const int strip_index = bgt_random(0, 8);
             bgt_set_color(BGT_BLACK);
             bgt_draw_text(60, 440, "下标 = bgt_random(0, 8)：", 18);
@@ -218,18 +220,18 @@ int main()
             bgt_draw_text(die_x, 496, index_text, 18);
         }
         else if (part == 2) {
-            // =====================================================
-            // 板块 2：满天星 —— 随机位置、大小、颜色
-            // =====================================================
+            /// =====================================================
+            /// 板块 2：满天星 —— 随机位置、大小、颜色
+            /// =====================================================
             bgt_set_background(bgt_rgb(8, 8, 32));
             bgt_set_window_title("libbgt 随机数演示 - 板块 2：满天星");
 
-            // 先抽一个样例，稍后展示它的数值
+            /// 先抽一个样例，稍后展示它的数值
             const int sample_x = bgt_random(0, window_width);
             const int sample_y = bgt_random(260, window_height);
             const double sample_r = bgt_random(1.0, 3.5);
 
-            // 每一帧随机画 200 颗星星：位置、大小、颜色全部随机
+            /// 每一帧随机画 200 颗星星：位置、大小、颜色全部随机
             for (int i = 0; i < 200; i++) {
                 const int x = bgt_random(0, window_width);
                 const int y = bgt_random(260, window_height);
@@ -238,7 +240,7 @@ int main()
                 bgt_fill_circle(x, y, r);
             }
 
-            // 把样例星画成黄色并加白圈，方便和下方数字对照
+            /// 把样例星画成黄色并加白圈，方便和下方数字对照
             bgt_set_color(BGT_YELLOW);
             bgt_fill_circle(sample_x, sample_y,
                             static_cast<int>(sample_r) + 2);
@@ -246,7 +248,7 @@ int main()
             bgt_draw_circle(sample_x, sample_y,
                             static_cast<int>(sample_r) + 6);
 
-            // 文字最后画，保证可读
+            /// 文字最后画，保证可读
             bgt_set_color(BGT_WHITE);
             bgt_draw_text(40, 36, "板块 2：满天星 —— 随机填充画面", 32);
             bgt_draw_text(40, 94,
@@ -275,13 +277,13 @@ int main()
             bgt_draw_text(40, 224, sample_r_text, 18);
         }
         else if (part == 3) {
-            // =====================================================
-            // 板块 3：随机游走 —— 每帧随机挪一步
-            // =====================================================
+            /// =====================================================
+            /// 板块 3：随机游走 —— 每帧随机挪一步
+            /// =====================================================
             bgt_set_background(bgt_rgb(250, 250, 250));
             bgt_set_window_title("libbgt 随机数演示 - 板块 3：随机游走");
 
-            // 第一次进入本板块时，把小虫撒在画面中央区域
+            /// 第一次进入本板块时，把小虫撒在画面中央区域
             if (!walk_started) {
                 walk_started = true;
                 for (int i = 0; i < 8; i++) {
@@ -305,7 +307,7 @@ int main()
                           "思路。",
                           20);
 
-            // 每只小虫走一步，然后画出来
+            /// 每只小虫走一步，然后画出来
             for (int i = 0; i < 8; i++) {
                 const int dx = bgt_random(-3, 4);
                 const int dy = bgt_random(-3, 4);
@@ -330,15 +332,15 @@ int main()
             }
         }
         else {
-            // =====================================================
-            // 板块 4：随机种子 —— 可复现的随机
-            // =====================================================
+            /// =====================================================
+            /// 板块 4：随机种子 —— 可复现的随机
+            /// =====================================================
             bgt_set_background(bgt_rgb(250, 250, 250));
             bgt_set_window_title("libbgt 随机数演示 - 板块 4：随机种子");
 
-            // 第一次进入本板块、或按 R 时：重新生成"不播种"的右列和
-            // 三个小数样例——它们延续全局序列，每次都不一样。
-            // （必须在下面的播种之前取数：播种会把全局序列固定下来。）
+            /// 第一次进入本板块、或按 R 时：重新生成"不播种"的右列和
+            /// 三个小数样例——它们延续全局序列，每次都不一样。
+            /// （必须在下面的播种之前取数：播种会把全局序列固定下来。）
             if (!seed_demo_ready || bgt_key_just_pressed(BGT_KEY_R)) {
                 for (int i = 0; i < 10; i++) {
                     plain_nums[i] = bgt_random(1, 100);
@@ -348,8 +350,8 @@ int main()
                 }
             }
 
-            // 左列只在第一次进入时生成一次：固定种子 42 的结果永远
-            // 不变，重新生成也会一模一样。
+            /// 左列只在第一次进入时生成一次：固定种子 42 的结果永远
+            /// 不变，重新生成也会一模一样。
             if (!seed_demo_ready) {
                 seed_demo_ready = true;
                 bgt_random_seed(42);
@@ -402,7 +404,7 @@ int main()
             bgt_draw_text(40, 605, "按【R】重新生成右列与小数样例。", 18);
         }
 
-        // 底部统一提示（板块 2 是深色背景，用浅色文字）
+        /// 底部统一提示（板块 2 是深色背景，用浅色文字）
         if (part < 4) {
             if (part == 2) {
                 bgt_set_color(BGT_LIGHT_GRAY);
@@ -414,7 +416,7 @@ int main()
                           18);
         }
 
-        // 每个板块都支持按空格进入下一板块；最后一个板块按空格关闭
+        /// 每个板块都支持按空格进入下一板块；最后一个板块按空格关闭
         if (bgt_key_just_pressed(BGT_KEY_SPACE)) {
             if (part == 4) {
                 break;

@@ -11,3 +11,6 @@ package-*/
 
 # vscode settings
 .vscode/
+
+# Doxygen 生成的 API 文档
+docs/doxygen/
