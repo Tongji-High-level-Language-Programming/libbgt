@@ -312,9 +312,35 @@ void bgt_set_window_title(const char title[]);
  * 创建颜色、设置当前绘图颜色与画布底色。
  * @{
  */
+/** @breif 使用色相、饱和度、亮度三个颜色分量创建一个不透明颜色。
+ *
+ * 色相分量建议取 [0, 360) 的实数，饱和度和亮度分量建议取 [0, 1] 的实数；
+ * 超出范围的色相分量会被规范化，饱和度和亮度分量会被限制到有效范围。
+ *
+ * @param r 色相分量 0 <= h < 360，实数。
+ * @param s 饱和度分量 0 <= s <= 1，实数。
+ * @param l 亮度分量 0 <= l <= 1，实数。
+ * @return 转换为 RGBA 的不透明无符号整数颜色值。
+ */
+unsigned bgt_hsl(double h, double s, double l);
+
+/** @breif 使用色相、饱和度、亮度、不透明度四个分量创建一个颜色。
+ *
+ * 不透明度建议取 [0, 1] 的实数，0 表示完全透明，1 表示完全不透明
+ * 任一参数非有限时返回不透明黑色
+ *
+ * @param r 色相分量 0 <= h < 360，实数。
+ * @param s 饱和度分量 0 <= s <= 1，实数。
+ * @param l 亮度分量 0 <= l <= 1，实数。
+ * @param a 不透明度 0 <= a <= 1，实数。
+ * @return 转换为 RGBA 的不透明无符号整数颜色值。
+ */
+unsigned bgt_hsla(double h, double s, double l, double a);
+
 /** @brief 使用红、绿、蓝三个颜色分量创建一个不透明颜色。
  *
  * 每个分量建议取 0 到 255；超出范围的值会被限制到有效范围。
+ * 任一参数非有限时返回不透明黑色
  *
  * @param r 红色分量（0 到 255）。
  * @param g 绿色分量（0 到 255）。
@@ -341,7 +367,7 @@ unsigned bgt_rgba(int r, int g, int b, int a);
  *
  * 后续的点、线、矩形、圆、文字等绘制函数都会使用这个颜色，直到再次调用
  * bgt_set_color() 改变它。color 可以是 BGT_* 颜色常量、bgt_rgb() 或
- * bgt_rgba() 的返回值。
+ * bgt_rgba() 或 bgt_hsl() 或 bgt_hsla() 的返回值。
  *
  * @param color 无符号整数颜色值。
  */
