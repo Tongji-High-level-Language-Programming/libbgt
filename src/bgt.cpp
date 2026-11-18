@@ -1204,6 +1204,73 @@ void bgt_set_window_title(const char title[])
     }
 }
 
+unsigned bgt_hsl(double h, double s, double l)
+{
+    return bgt_hsla(h, s, l, 1.0);
+}
+
+unsigned bgt_hsla(double h, double s, double l, double a)
+{
+    if (!std::isfinite(h) || !std::isfinite(s) || !std::isfinite(l) ||
+        !std::isfinite(a)) {
+        return bgt_rgba(0, 0, 0, 255);
+    }
+
+    h = std::fmod(h, 360.0);
+    if (h < 0.0) {
+        h += 360.0;
+    }
+
+    s = std::clamp(s, 0.0, 1.0);
+    l = std::clamp(l, 0.0, 1.0);
+    a = std::clamp(a, 0.0, 1.0);
+
+    const double c = (1.0 - std::abs(2.0 * l - 1.0)) * s;
+    const double hp = h / 60.0;
+    const double x = c * (1.0 - std::abs(std::fmod(hp, 2.0) - 1.0));
+    const double m = l - c / 2.0;
+
+    double r, g, b;
+
+    if (hp < 1.0) {
+        r = c;
+        g = x;
+        b = 0.0;
+    }
+    else if (hp < 2.0) {
+        r = x;
+        g = c;
+        b = 0.0;
+    }
+    else if (hp < 3.0) {
+        r = 0.0;
+        g = c;
+        b = x;
+    }
+    else if (hp < 4.0) {
+        r = 0.0;
+        g = x;
+        b = c;
+    }
+    else if (hp < 5.0) {
+        r = x;
+        g = 0.0;
+        b = c;
+    }
+    else {
+        r = c;
+        g = 0.0;
+        b = x;
+    }
+
+    const auto to_byte = [](double v) -> int {
+        return static_cast<int>(
+            std::lround(std::clamp(v, 0.0, 1.0) * 255.0));
+    };
+
+    return bgt_rgba(to_byte(r + m), to_byte(g + m), to_byte(b + m), to_byte(a));
+}
+
 unsigned bgt_rgb(int r, int g, int b)
 {
     return bgt_rgba(r, g, b, 255);
